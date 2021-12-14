@@ -151,7 +151,7 @@ double & CVector::operator[](const unsigned long & i) const{
 
 double CVector::dotProd(const CVector & v) const{
   if(nElm != v.nElm){
-    cerr << "CVector::dotProd(const CVector &, const CVector &): " << "sizes do not math" << endl;
+    cerr << "CVector::dotProd(const CVector &, const CVector &): " << "sizes do not match" << endl;
     throw(-1);
   }
 

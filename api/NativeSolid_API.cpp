@@ -1091,7 +1091,7 @@ void NativeSolidSolver::setGeneralisedForce(){
     (integrator->GetSolver()->GetLoads())[0] = -ForceY;
   }
   else{
-    cerr << "Wrong structural type for applying global fluild loads !" << endl;
+    cerr << "Wrong structural type for applying global fluid loads !" << endl;
     throw(-1);
   }
 
@@ -1109,7 +1109,7 @@ void NativeSolidSolver::setGeneralisedForce(double Fx, double Fy){
     (integrator->GetSolver()->GetLoads())[0] = -Fy;
   }
   else{
-    cerr << "Wrong structural type for applying global fluild loads !" << endl;
+    cerr << "Wrong structural type for applying global fluid loads !" << endl;
     throw(-1);
   }
 }
@@ -1139,7 +1139,7 @@ void NativeSolidSolver::setGeneralisedMoment(){
   else if(config->GetStructType() == "SPRING_VER"){}
   else if(config->GetStructType() == "SPRING_HOR"){}
   else{
-    cerr << "Wrong structural type for applying global fluild loads !" << endl;
+    cerr << "Wrong structural type for applying global fluid loads !" << endl;
     throw(-1);
   }
 
@@ -1153,7 +1153,7 @@ void NativeSolidSolver::setGeneralisedMoment(double M){
   else if(config->GetStructType() == "SPRING_VER"){}
   else if(config->GetStructType() == "SPRING_HOR"){}
   else{
-    cerr << "Wrong structural type for applying global fluild loads !" << endl;
+    cerr << "Wrong structural type for applying global fluid loads !" << endl;
     throw(-1);
   }
 }

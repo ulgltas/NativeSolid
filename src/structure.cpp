@@ -73,7 +73,7 @@ Structure::Structure(Config* config){
   }
   else{
     nDof = 0;
-    cerr << "Invalid structural type. Available choices are : SPRIN_HOR, SPRING_VER and AIRFOIL." << endl;
+    cerr << "Invalid structural type. Available choices are : SPRING_HOR, SPRING_VER and AIRFOIL." << endl;
     throw(-1);
   }
 }

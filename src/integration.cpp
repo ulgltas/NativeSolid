@@ -26,6 +26,9 @@ Integration::Integration(Config *config, Structure *structure){
     else{
     }
   }
+  else if (config->GetUnsteady() == "HARMONIC"){
+    solver = new HarmonicSolver(structure->GetnDof(), config->GetNumberHarmonics(), linear);
+  }
   else
     solver = new StaticSolver(structure->GetnDof(), linear);
 }
@@ -146,6 +149,64 @@ void Integration::StaticIteration(Structure *structure){
   }
 }
 
+void Integration::HarmonicIteration(Config* config, Structure *structure){
+
+  int rank = 0;
+  double currentTime = 0.0;
+#ifdef HAVE_MPI
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+
+  double t0 = 0.;
+  double tf = 0.;
+  unsigned long nInstances;
+  deltaT = config->GetDeltaT();
+  solver->Iterate(t0, deltaT, structure);
+  nInstances = 2*config->GetNumberHarmonics()+1;
+  
+  if(rank == 0){
+  if(structure->GetnDof() == 1){
+    cout << fixed
+         << setw(10) << "Time"
+         << setw(15) << "Displacement"
+         << setw(15) << "Velocity"
+         << setw(15) << "Acceleration" << endl;
+    for (int i = 0; i < nInstances; i++)
+    {
+      cout << fixed
+         << setw(10) << currentTime
+         << setw(15) << (solver->GetDisp())[i]
+         << setw(15) << (solver->GetVel())[i]
+         << setw(15) << (solver->GetAcc())[i] << endl;
+      currentTime += config->GetStopTime()/nInstances;
+    }
+    
+    
+  }
+  else if(structure->GetnDof() == 2){
+    cout << fixed
+         << setw(10) << "Time"
+         << setw(15) << "Displacement1"
+         << setw(15) << "Displacement2"
+         << setw(15) << "Velocity1"
+         << setw(15) << "Velocity2"
+         << setw(15) << "Acceleration1"
+         << setw(15) << "Acceleration2" << endl;
+    currentTime = 0.;
+    for (int i = 0; i < nInstances; i++){
+        cout << fixed
+              << setw(10) << currentTime
+              << setw(15) << (solver->GetDisp())[i]
+              << setw(15) << (solver->GetDisp())[i+nInstances]
+              << setw(15) << (solver->GetVel())[i]
+              << setw(15) << (solver->GetVel())[i+nInstances]
+              << setw(15) << (solver->GetAcc())[i]
+              << setw(15) << (solver->GetAcc())[i+nInstances] << endl;
+        currentTime += config->GetStopTime()/nInstances;
+      }
+    }
+  }
+}
 
 void Integration::UpdateSolution(){
 

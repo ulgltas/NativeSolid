@@ -860,53 +860,6 @@ void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
   }
   
 }
-    LHS.SetElm(i, i, structure->Get_Kh());
-  }
-  LHS += ScalMatProd(structure->Get_Ch(), d);
-  LHS += ScalMatProd(structure->Get_m(), d2);
-  SolveSys(LHS, state);
-  tempvel.Initialize(_nOmega, 0.0);
-  tempacc.Initialize(_nOmega, 0.0);
-  tempvel = MatVecProd(d, state);
-  tempacc = MatVecProd(d2, state);
-  for (int i = 0; i < _nOmega; i++){
-    q[i] = state[i];
-    qdot[i] = tempvel[i];
-    qddot[i] = tempacc[i];
-    if (i>0){
-      q_n[i] = state[i-1];
-      qdot_n[i] = tempvel[i-1];
-      qddot_n[i] = tempacc[i-1];
-    }
-  }
-  if (_nDof == 2){
-    state.Reset();
-    state += stateLoads;
-    LHS.Reset();
-    for (int i = 1; i <= _nOmega; i++)
-    {
-      LHS.SetElm(i, i, structure->Get_Ka());
-    }
-    LHS += ScalMatProd(structure->Get_Ca(), d);
-    LHS += ScalMatProd(structure->Get_If(), d2);
-    SolveSys(LHS, state);
-    tempvel.Reset();
-    tempacc.Reset();
-    tempvel = MatVecProd(d, state);
-    tempacc = MatVecProd(d2, state);
-    for (int i = 0; i < _nOmega; i++){
-      q[i+_nOmega] = state[i];
-      qdot[i+_nOmega] = tempvel[i];
-      qddot[i+_nOmega] = tempacc[i];
-      if (i>0){
-        q_n[i+_nOmega] = state[i-1];
-        qdot_n[i+_nOmega] = tempvel[i-1];
-        qddot_n[i+_nOmega] = tempacc[i-1];
-    }
-    }
-  }
-  
-}
 
 void HarmonicSolver::SetStateLoads(unsigned int iInstance, double load){
   stateLoads[iInstance] = Loads[0];

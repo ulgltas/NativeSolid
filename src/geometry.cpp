@@ -229,12 +229,16 @@ Geometry::Geometry(Config* config){
     position = textLine.find("MARKER_TAG=",0);
     if (position != string::npos){
       textLine.erase(0,12);
+      cout << textLine << endl;
       cout << "Reading elements for marker : " << textLine << endl;
-      if (textLine == config->GetMovingMarker()){
+      if (textLine.compare(config->GetMovingMarker()) == 0){
         cout << "Marker " << textLine << " is a moving marker." << endl;
         markersMoving[iMarker] = true;
       }
-      else markersMoving[iMarker] = false;
+      else{
+        markersMoving[iMarker] = false;
+        cout << "Only marker " << config->GetMovingMarker() << "is a moving marker." << endl;
+      } 
     }
 
     position = textLine.find("MARKER_ELEMS=",0);

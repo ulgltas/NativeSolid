@@ -72,6 +72,8 @@ void Config::ReadConfig()
 	else if (option == "DELTA_T") DELTA_T = atof(text_line.c_str());
 	else if (option == "DELTA_ITER_WRITE") DELTAITERWRITE = atol(text_line.c_str());
 	else if (option == "STOP_TIME") STOP_TIME = atof(text_line.c_str());
+    else if (option == "OMEGA") OMEGA = atof(text_line.c_str());
+    else if (option == "NUMBER_HARMONICS") NUMBER_HARMONICS = atol(text_line.c_str());
 	else if (option == "RHO") RHO = atof(text_line.c_str());
         else cout << "The option " + option + " is not recognized !" << endl;
 	}
@@ -82,6 +84,7 @@ void Config::ReadConfig()
     else cout << "Cannot run the solver with other value than NATIVE for CSD_SOLVER option !" << endl;
 
     if (UNSTEADY_SIMULATION == "YES") cout << "Dynamic structure computation" << endl;
+    else if (UNSTEADY_SIMULATION == "HARMONIC") cout << "Harmonic balance structure computation" << endl;
     else cout << "Static structure computation" << endl;
 
     if (STRUCT_TYPE == "SPRING_HOR" || STRUCT_TYPE == "SPRING_VER") cout << "Structural model is a plunging spring" << endl;
@@ -195,6 +198,14 @@ double Config::GetInitialDisp(){
 
 double Config::GetInitialAngle(){
   return INITIAL_ANGLE;
+}
+
+double Config::GetOmega(){
+    return OMEGA;
+}
+
+unsigned long Config::GetNumberHarmonics(){
+    return NUMBER_HARMONICS;
 }
 
 double Config::GetRho(){

@@ -29,5 +29,6 @@ public:
     void SetInitialConditions(Config* config, Structure* structure);
     void TemporalIteration(double& t0, double& tf, Structure *structure);
     void StaticIteration(Structure *structure);
+    void HarmonicIteration(Config* config, Structure *structure);
     void UpdateSolution();
 };

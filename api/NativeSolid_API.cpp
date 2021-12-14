@@ -73,7 +73,7 @@ NativeSolidSolver::NativeSolidSolver(string str, bool FSIComp):confFile(str){
 
     if(rank == MASTER_NODE){
       if(structure->GetnDof() == 1){
-        if(config->GetUnsteady() == "YES"){
+        if(config->GetUnsteady() == "YES" || config->GetUnsteady() == "HARMONIC"){
           historyFile << fixed
                       << setw(10) << "Delta_t"
                       << setw(10) << "FSI iter"
@@ -98,7 +98,7 @@ NativeSolidSolver::NativeSolidSolver(string str, bool FSIComp):confFile(str){
         }
       }
       else if(structure->GetnDof() == 2){
-        if(config->GetUnsteady() == "YES"){
+        if(config->GetUnsteady() == "YES" || config->GetUnsteady() == "HARMONIC"){
           historyFile << fixed
                       << setw(10) << "Delta_t"
                       << setw(10) << "FSI iter"
@@ -463,6 +463,155 @@ void NativeSolidSolver::computeInterfacePosVel(bool initialize){
 
 }
 
+void NativeSolidSolver::computeInterfacePosVel(bool initialize, unsigned int instance){
+
+    double *Coord, *Coord_n, newCoord[3], newVel[3], Center[3], Center_n[3], newCenter[3], centerVel[3], rotCoord[3], r[3];
+    double varCoord[3] = {0.0, 0.0, 0.0};
+    double rotMatrix[3][3] = {{0.0,0.0,0.0}, {0.0,0.0,0.0}, {0.0,0.0,0.0}};
+    double dTheta, dPhi, dPsi;
+    double psidot;
+    double cosTheta, sinTheta, cosPhi, sinPhi, cosPsi, sinPsi;
+    unsigned short iMarker, iVertex, nDim(3);
+    unsigned long iPoint;
+    unsigned int nInstances = 2*config->GetNumberHarmonics()+1;
+    double varCoordNorm2(0.0);
+
+    if(config->GetUnsteady() != "HARMONIC"){
+      instance = 0;
+      nInstances = 1;
+    }
+    else if (instance>=nInstances){
+      instance = nInstances-1;
+    }
+    
+
+    /*--- Get the current center of rotation (can vary at each iteration) ---*/
+    Center[0] = structure->GetCenterOfRotation_x();
+    Center[1] = structure->GetCenterOfRotation_y();
+    Center[2] = structure->GetCenterOfRotation_z();
+
+    /*--- Get the center of rotation from previous time step ---*/
+    Center_n[0] = structure->GetCenterOfRotation_n_x();
+    Center_n[1] = structure->GetCenterOfRotation_n_y();
+    Center_n[2] = structure->GetCenterOfRotation_n_z();
+
+    dTheta = 0.0;
+    dPhi = 0.0;
+    if (config->GetStructType() == "AIRFOIL"){
+      dPsi = -( (integrator->GetSolver()->GetDisp())[instance+nInstances] - (integrator->GetSolver()->GetDisp_n())[instance+nInstances] );
+      psidot = (integrator->GetSolver()->GetVel())[instance+nInstances];
+      newCenter[0] = Center[0];
+      newCenter[1] = -(integrator->GetSolver()->GetDisp())[instance];
+      newCenter[2] = Center[2];
+      centerVel[0] = 0.0;
+      centerVel[1] = -(integrator->GetSolver()->GetVel())[instance];
+      centerVel[2] = 0.0;
+    }
+    else if(config->GetStructType() == "SPRING_HOR"){
+      dPsi = 0.0;
+      psidot = 0.0;
+      newCenter[0] = (integrator->GetSolver()->GetDisp())[instance];
+      newCenter[1] = Center[1];
+      newCenter[2] = Center[2];
+      centerVel[0] = (integrator->GetSolver()->GetVel())[instance];
+      centerVel[1] = 0.0;
+      centerVel[2] = 0.0;
+    }
+    else if(config->GetStructType() == "SPRING_VER"){
+      dPsi = 0.0;
+      psidot = 0.0;
+      newCenter[0] = Center[0];
+      newCenter[1] = (integrator->GetSolver()->GetDisp())[instance];
+      newCenter[2] = Center[2];
+      centerVel[0] = 0.0;
+      centerVel[1] = (integrator->GetSolver()->GetVel())[instance];
+      centerVel[2] = 0.0;
+    }
+    else { }
+
+    cosTheta = cos(dTheta);  cosPhi = cos(dPhi);  cosPsi = cos(dPsi);
+    sinTheta = sin(dTheta);  sinPhi = sin(dPhi);  sinPsi = sin(dPsi);
+
+    /*--- Compute the rotation matrix. The implicit
+    ordering is rotation about the x-axis, y-axis, then z-axis. ---*/
+
+    rotMatrix[0][0] = cosPhi*cosPsi;
+    rotMatrix[1][0] = cosPhi*sinPsi;
+    rotMatrix[2][0] = -sinPhi;
+
+    rotMatrix[0][1] = sinTheta*sinPhi*cosPsi - cosTheta*sinPsi;
+    rotMatrix[1][1] = sinTheta*sinPhi*sinPsi + cosTheta*cosPsi;
+    rotMatrix[2][1] = sinTheta*cosPhi;
+
+    rotMatrix[0][2] = cosTheta*sinPhi*cosPsi + sinTheta*sinPsi;
+    rotMatrix[1][2] = cosTheta*sinPhi*sinPsi - sinTheta*cosPsi;
+    rotMatrix[2][2] = cosTheta*cosPhi;
+
+
+    for(iMarker = 0; iMarker < geometry->GetnMarkers(); iMarker++){
+      if (geometry->markersMoving[iMarker] == true){
+        for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
+
+          iPoint = geometry->vertex[iMarker][iVertex];
+          Coord = geometry->node[iPoint]->GetCoord();
+          Coord_n = geometry->node[iPoint]->GetCoord_n();
+
+          if(config->GetUnsteady() == "YES" || config->GetUnsteady() == "HARMONIC"){
+            for (int iDim=0; iDim < nDim; iDim++){
+              r[iDim] = Coord_n[iDim] - Center_n[iDim];
+            }
+          }
+          else{
+            for (int iDim=0; iDim < nDim; iDim++){
+              r[iDim] = Coord[iDim] - Center[iDim];
+            }
+          }
+
+          rotCoord[0] = rotMatrix[0][0]*r[0]
+                + rotMatrix[0][1]*r[1]
+                + rotMatrix[0][2]*r[2];
+
+          rotCoord[1] = rotMatrix[1][0]*r[0]
+                + rotMatrix[1][1]*r[1]
+                + rotMatrix[1][2]*r[2];
+
+          rotCoord[2] = rotMatrix[2][0]*r[0]
+                + rotMatrix[2][1]*r[1]
+                + rotMatrix[2][2]*r[2];
+
+          for(int iDim=0; iDim < nDim; iDim++){
+                  newCoord[iDim] = newCenter[iDim] + rotCoord[iDim];
+                  varCoord[iDim] = newCoord[iDim] - Coord[iDim];
+          }
+
+          newVel[0] = centerVel[0] + psidot*(newCoord[1]-newCenter[1]);
+          newVel[1] = centerVel[1] - psidot*(newCoord[0]-newCenter[0]);
+          newVel[2] = centerVel[2] + 0.0;
+
+          varCoordNorm2 += varCoord[0]*varCoord[0] + varCoord[1]*varCoord[1] + varCoord[2]*varCoord[2];
+
+          /*--- Apply change of coordinates to the node on the moving interface ---*/
+          geometry->node[iPoint]->SetCoord(newCoord);
+          geometry->node[iPoint]->SetVel(newVel);
+
+          /*--- At initialisation, propagate the initial position of the inteface in the past ---*/
+          if(initialize){
+              geometry->node[iPoint]->SetCoord_n(newCoord);
+              geometry->node[iPoint]->SetVel_n(newVel);
+          }
+        }
+      }
+    }
+
+    varCoordNorm = sqrt(varCoordNorm2);
+
+    /*--- Update the position of the center of rotation ---*/
+    structure->SetCenterOfRotation_X(newCenter[0]);
+    structure->SetCenterOfRotation_Y(newCenter[1]);
+    structure->SetCenterOfRotation_Z(newCenter[2]);
+
+}
+
 void NativeSolidSolver::setInitialDisplacements(){
   //mapRigidBodyMotion(false, true);
   computeInterfacePosVel(true);
@@ -472,6 +621,14 @@ void NativeSolidSolver::setInitialDisplacements(){
 void NativeSolidSolver::staticComputation(){
 
   integrator->StaticIteration(structure);
+
+  //mapRigidBodyMotion(false,false);
+  computeInterfacePosVel(false);
+}
+
+void NativeSolidSolver::harmonicComputation(){
+
+  integrator->HarmonicIteration(config, structure);
 
   //mapRigidBodyMotion(false,false);
   computeInterfacePosVel(false);
@@ -609,6 +766,20 @@ void NativeSolidSolver::writeSolution(double time, int FSIter){
                      << setw(15) << (integrator->GetSolver()->GetVel())[0]
                      << setw(15) << (integrator->GetSolver()->GetAcc())[0] << endl;
       }
+      else if(config->GetUnsteady() == "HARMONIC"){
+        double currentTime = 0.;
+        unsigned short nInst = 2*getNumberHarmonics()+1;
+        for (unsigned short iInst = 0; iInst < nInst ; iInst++)
+        {
+          historyFile2 << fixed
+                       << setw(10) << currentTime
+                       << setw(10) << FSIter
+                       << setw(15) << (integrator->GetSolver()->GetDisp())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetVel())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetAcc())[iInst] << endl;
+          currentTime += config->GetStopTime()/nInst;
+        }
+      }
       else{
         historyFile2 << fixed
                      << setw(10) << FSIter
@@ -626,6 +797,26 @@ void NativeSolidSolver::writeSolution(double time, int FSIter){
                      << setw(15) << (integrator->GetSolver()->GetVel())[1]
                      << setw(15) << (integrator->GetSolver()->GetAcc())[0]
                      << setw(15) << (integrator->GetSolver()->GetAcc())[1] << endl;
+      }
+      else if(config->GetUnsteady() == "HARMONIC"){
+        double currentTime = 0.;
+        unsigned short nInst = 2*getNumberHarmonics()+1;
+        for (unsigned short iInst = 0; iInst < nInst ; iInst++)
+        {
+          historyFile2 << fixed
+                       << setw(10) << currentTime
+                       << setw(10) << FSIter
+                       << setw(15) << (integrator->GetSolver()->GetDisp())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetDisp())[iInst+nInst]
+                       << setw(15) << (integrator->GetSolver()->GetVel())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetVel())[iInst+nInst]
+                       << setw(15) << (integrator->GetSolver()->GetAcc())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetAcc())[iInst+nInst]
+                       << setw(15) << (integrator->GetSolver()->GetL2Norm())
+                       << setw(15) << (integrator->GetSolver()->GetdL2dwNorm())
+                       << setw(15) << (integrator->GetSolver()->GetOmega()) << endl;
+          currentTime += config->GetStopTime()/nInst;
+        }
       }
       else{
         historyFile2 << fixed
@@ -981,4 +1172,16 @@ void NativeSolidSolver::applyload(unsigned short iVertex, double Fx, double Fy, 
     iPoint = geometry->vertex[iMarker][iVertex];
     geometry->node[iPoint]->SetForce(Force);
 
+}
+
+void NativeSolidSolver::applyload(unsigned int iHarmonic, double Fx){
+    integrator->GetSolver()->SetStateLoads(iHarmonic, Fx);
+}
+
+void NativeSolidSolver::applypitch(unsigned int iHarmonic, double alpha){
+    integrator->GetSolver()->SetStates(iHarmonic, 2, alpha);
+}
+
+unsigned int NativeSolidSolver::getNumberHarmonics(){
+    return config->GetNumberHarmonics();
 }

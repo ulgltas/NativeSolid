@@ -338,6 +338,20 @@ CVector MatVecProd(const CMatrix &A, const CVector &b){
 
 }
 
+CMatrix MatMatProd(const CMatrix &A, const CMatrix &B){
+
+  CMatrix X(A.GetnEq(), B.GetnVar(), 0);
+  if (A.GetnVar() != B.GetnEq())
+  {
+    cerr << "CMatrix MatMatProd(const CMatrix &A, const CMatrix &B): " << "invalid inputs : size of A = " << A.GetnEq() << "x" << A.GetnVar() << "size of B = " << B.GetnEq() << "x" << B.GetnVar()<< endl;
+    throw(-1);
+  }
+  
+  cblas_dgemm(CblasColMajor,CblasNoTrans,CblasNoTrans,A.GetnEq(),B.GetnVar(),A.GetnVar(),1.0,A.GetMat(),A.GetnEq(),B.GetMat(),B.GetnEq(),0.0,X.GetMat(),X.GetnEq());
+  return X;
+
+}
+
 CVector ScalVecProd(const double & scal, const CVector &b){
 
   CVector x(b.GetSize());
@@ -366,6 +380,22 @@ int SolveSys(const CMatrix &A, CVector &b){
   IPIV = new int[N];
 
   INFO = LAPACKE_dgesv(LAPACK_COL_MAJOR,N,NRHS,Mat.GetMat(),LDA,IPIV,b.GetVec(),LDB);
+
+  return INFO;
+}
+
+int SolveSys(const CMatrix &A, CMatrix &B){
+  const int N = A.GetnEq();
+  const int LDA = A.GetnVar();
+  CMatrix Mat(A);
+  int NRHS = B.GetnEq();
+  int *IPIV;
+  int LDB = B.GetnVar();
+  int INFO(-1);
+
+  IPIV = new int[N];
+
+  INFO = LAPACKE_dgesv(LAPACK_COL_MAJOR,N,NRHS,Mat.GetMat(),LDA,IPIV,B.GetMat(),LDB);
 
   return INFO;
 }

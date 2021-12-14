@@ -40,8 +40,10 @@ public:
     void timeIteration(double t0, double tf);
     //void mapRigidBodyMotion(bool predicition, bool initialize);
     void computeInterfacePosVel(bool initialize);
+    void computeInterfacePosVel(bool initialize, unsigned int instance);
     void setInitialDisplacements();
     void staticComputation();
+    void harmonicComputation();
     void writeSolution(double currentTime, double lastTime, double currentFSIIter, unsigned long ExtIter, unsigned long NbExtIter);
     void writeSolution(double time, int FSIter);
     void saveSolution();
@@ -74,4 +76,10 @@ public:
     void setGeneralisedMoment();
     void setGeneralisedMoment(double M);
     void applyload(unsigned short iVertex, double Fx, double Fy, double Fz);
+    void applyload(unsigned int iHarmonic, double Fx);
+    void applypitch(unsigned int iHarmonic, double alpha);
+    unsigned int getNumberHarmonics();
+    inline double GetL2Norm() {return integrator->GetSolver()->GetL2Norm();}
+    inline double GetdL2dwNorm() {return integrator->GetSolver()->GetdL2dwNorm();}
+    inline void setOmega(double val_omega) {integrator->GetSolver()->SetOmega(val_omega);}
 };

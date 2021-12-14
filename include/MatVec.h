@@ -66,7 +66,9 @@ public:
 CVector MatVecProd(const CMatrix & A, const CVector & b);
 CVector ScalVecProd(const double & scal, const CVector & b);
 CMatrix ScalMatProd(const double & scal, const CMatrix & A);
+CMatrix MatMatProd(const CMatrix &A, const CMatrix &B);
 int SolveSys(const CMatrix & A, CVector & b);
+int SolveSys(const CMatrix & A, CMatrix & B);
 
 void MatrixToVec(int order, double** matrix, double* vecteur, int Nrow, int Ncol, int sizeVec);
 void VecToMatrix(int order, double** matrix, double* vecteur, int Nrow, int Ncol, int sizeVec);

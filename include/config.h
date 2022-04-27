@@ -13,6 +13,8 @@ public:
     virtual std::string GetMeshFile();
     virtual std::string GetUnsteady();
     virtual std::string GetCSDSolver();
+    virtual std::string GetKindProblem();
+    virtual std::string GetObjFunction();
     virtual std::string GetStructType();
     virtual std::string GetLinearize();
     virtual std::string GetIntegrationAlgo();
@@ -41,7 +43,7 @@ public:
 
 protected:
     std::string ConfigFileName;
-    std::string MESH_FILE, UNSTEADY_SIMULATION, CSD_SOLVER, STRUCT_TYPE, LINEARIZE, INTEGRATION_ALGO, RESTART_SOL, RESTART_FILE, MOVING_MARKER;
+    std::string MESH_FILE, UNSTEADY_SIMULATION, CSD_SOLVER, KIND_PROBLEM, OBJ_FUNCTION, STRUCT_TYPE, LINEARIZE, INTEGRATION_ALGO, RESTART_SOL, RESTART_FILE, MOVING_MARKER;
     double SPRING_STIFFNESS, SPRING_MASS, INERTIA_CG, INERTIA_FLEXURAL, SPRING_DAMPING, TORSIONAL_STIFFNESS, TORSIONAL_DAMPING, CORD, FLEXURAL_AXIS, GRAVITY_CENTER, INITIAL_DISP, INITIAL_ANGLE, START_TIME, DELTA_T, STOP_TIME, OMEGA, RHO;
     unsigned long DELTAITERWRITE, NUMBER_HARMONICS;
 

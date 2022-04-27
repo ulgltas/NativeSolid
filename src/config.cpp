@@ -48,6 +48,8 @@ void Config::ReadConfig()
         option.erase(remove(option.begin(), option.end(), ' '), option.end());
 	text_line.erase(remove(text_line.begin(), text_line.end(),' '),text_line.end());
 	if (option == "CSD_SOLVER") CSD_SOLVER = text_line;
+    else if (option == "KIND_PROBLEM") KIND_PROBLEM = text_line;
+    else if (option == "OBJ_FUNCTION") OBJ_FUNCTION = text_line;
 	else if (option == "MESH_FILE") MESH_FILE = text_line;
 	else if (option == "UNSTEADY_SIMULATION") UNSTEADY_SIMULATION = text_line;
 	else if (option == "STRUCT_TYPE") STRUCT_TYPE = text_line;
@@ -105,6 +107,16 @@ std::string Config::GetUnsteady()
 std::string Config::GetCSDSolver()
 {
     return CSD_SOLVER;
+}
+
+std::string Config::GetKindProblem()
+{
+    return KIND_PROBLEM;
+}
+
+std::string Config::GetObjFunction()
+{
+    return OBJ_FUNCTION;
 }
 
 std::string Config::GetStructType()

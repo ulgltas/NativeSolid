@@ -721,6 +721,53 @@ HarmonicSolver::~HarmonicSolver() {}
 void HarmonicSolver::SetInitialState(Config *config, Structure *structure){
   double omegaN2, damping;
   unsigned short nHarmonics;
+
+  if(config->GetRestartSol() == "YES"){
+    string InputFileName = config->GetRestartFile();
+    string text_line;
+    string token, tempString;
+    size_t pos;
+    string delimiter = "\t";
+    ifstream InputFile;
+    InputFile.open(InputFileName.c_str(), ios::in);
+    double buffer[(3*structure->GetnDof())+1];
+    int kk = 0;
+    int jj;
+    while (getline(InputFile,text_line) && kk < _nOmega+1){
+      tempString = text_line;
+      jj = 0;
+      if (kk >= 1){
+        while ((pos = tempString.find(delimiter)) != string::npos){
+          token = tempString.substr(0,pos);
+          tempString.erase(0,pos+delimiter.length());
+          buffer[jj] = atof(token.c_str());
+          jj += 1;
+        }
+        buffer[jj] = atof(tempString.c_str());
+
+        if(structure->GetnDof() == 1){
+          q[kk-1]     = buffer[1];
+          qdot[kk-1]  = buffer[2];
+          qddot[kk-1] = buffer[3];
+        }
+        else if (structure->GetnDof() == 2){
+          q[kk-1]             = buffer[1];
+          q[kk-1+_nOmega]     = buffer[2];
+          qdot[kk-1]          = buffer[3];
+          qdot[kk-1+_nOmega]  = buffer[4];
+          qddot[kk-1]         = buffer[5];
+          qddot[kk-1+_nOmega] = buffer[6];
+        }
+        q.print();
+        qdot.print();
+        qddot.print();
+      }
+      kk += 1;
+    }
+    InputFile.close();
+  }
+
+
   E.Initialize(_nOmega, _nOmega, 0.0);
   Em1.Initialize(_nOmega, _nOmega, 1.0);
   omega = config->GetOmega();

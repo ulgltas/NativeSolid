@@ -71,6 +71,14 @@ CVector & Solver::GetAccVar_n(){
   return a_n;
 }
 
+CVector & Solver::GetAdjLoads(){
+  return a_n;
+}
+
+CVector & Solver::GetAdjDisps(){
+  return a_n;
+}
+
 void Solver::ResetSolution(){
   q.Reset();
   qdot.Reset();
@@ -934,4 +942,118 @@ void HarmonicSolver::SetStates(unsigned int iInstance, unsigned int DoF, double 
     qdot[i+(DoF-1)*_nOmega] = tempvel[i];
     qddot[i+(DoF-1)*_nOmega] = tempacc[i];
   }*/
+}
+
+/*CLASS ADJOINTSTATICSOLVER*/
+AdjointStaticSolver::AdjointStaticSolver(unsigned nDof, bool bool_linear) : StaticSolver(nDof, bool_linear)
+{
+  _nDof = nDof;
+  Adjointq.Initialize(_nDof, 0.0);
+  AdjointLoad.Initialize(_nDof, 0.);
+}
+
+AdjointStaticSolver::~AdjointStaticSolver()
+{
+  std::cout << "NativeSolid::~AdjointStaticSolver()" << std::endl;
+}
+
+void AdjointStaticSolver::Iterate(double &t0, double &tf, Structure* structure)
+{
+  // Solve KK*AdjointLoad = Adjointq
+  CVector RHS(_nDof, 0.);
+  int INFO; 
+  
+  RHS += Adjointq;
+  INFO=SolveSys(KK, RHS); // Adjoint means transposed matrix
+  AdjointLoad = RHS;
+  //cout << INFO << endl;
+  for (unsigned int i = 0; i < _nDof; i++)
+  {
+    for (unsigned int j = 0; j < _nDof; j++){
+      cout << "Adjoint K [" << i << j << "]: " << KK.GetElm(i+1, j+1) << endl;
+    }
+  }
+
+  for (unsigned int i = 0; i < _nDof; i++)
+  {
+    cout << "Adjoint load [" << i << "]: " << AdjointLoad[i] << endl;
+  }
+  
+}
+
+/*CLASS ADJOINTHARMONICSOLVER*/
+AdjointHarmonicSolver::AdjointHarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_linear) : HarmonicSolver(nDof, nHarmonic, bool_linear)
+{
+  _nDof = nDof;
+  _nOmega = 2*nHarmonic+1;
+  cout << "nHarmonic: " << nHarmonic << endl;
+  Adjointq.Initialize(_nDof*_nOmega, 0.0);
+  AdjointLoad.Initialize(_nDof*_nOmega, 0.);
+}
+
+AdjointHarmonicSolver::~AdjointHarmonicSolver()
+{
+  std::cout << "NativeSolid::~AdjointHarmonicSolver()" << std::endl;
+}
+
+void AdjointHarmonicSolver::Iterate(double &t0, double &tf, Structure* structure)
+{
+  // Solve KK*AdjointLoad = Adjointq
+  CVector RHS(_nDof*_nOmega, 0.);
+  CMatrix LHS(_nDof*_nOmega, _nDof*_nOmega, 0.0);
+
+  CMatrix MM(_nDof*_nOmega, _nDof*_nOmega, 0.0);
+  CMatrix CC(_nDof*_nOmega, _nDof*_nOmega, 0.0);
+  CMatrix KK(_nDof*_nOmega, _nDof*_nOmega, 0.0);
+
+  RHS += Adjointq;
+
+  for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
+  {
+    cout << "RHS[0]: " << RHS[iOmega] << endl;
+    KK.SetElm(iOmega+1, iOmega+1, structure->Get_Kh());
+    if (_nDof == 2)
+    {
+      KK.SetElm(iOmega+1+_nOmega, iOmega+1+_nOmega, structure->Get_Ka());
+    }
+    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    {
+      MM.SetElm(iOmega+1, jOmega+1, structure->Get_m()*d2.GetElm(jOmega+1, iOmega+1));
+      CC.SetElm(iOmega+1, jOmega+1, structure->Get_Ch()*d.GetElm(jOmega+1, iOmega+1));
+      if (_nDof == 2)
+      {
+        MM.SetElm(iOmega+1+_nOmega, jOmega+1+_nOmega, structure->Get_If()*d2.GetElm(jOmega+1, iOmega+1));
+        MM.SetElm(iOmega+1        , jOmega+1+_nOmega, structure->Get_S()*d2.GetElm(jOmega+1, iOmega+1));
+        MM.SetElm(iOmega+1+_nOmega, jOmega+1        , structure->Get_S()*d2.GetElm(jOmega+1, iOmega+1));
+        CC.SetElm(iOmega+1+_nOmega, jOmega+1+_nOmega, structure->Get_Ca()*d.GetElm(jOmega+1, iOmega+1));
+      }
+      
+    }
+    
+  }
+
+  LHS += MM;
+  LHS += CC;
+  LHS += KK;
+  cout << "LHS Matrix (" << _nOmega << ")" << endl;
+  /*for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++){
+    cout << LHS.GetElm(iOmega+1, 1) << endl;
+  }*/
+  for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
+  {
+    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    {
+      cout << LHS.GetElm(iOmega+1, jOmega+1) << "\t";
+    }
+    cout << endl;
+  }
+
+  cout << "LHS Matrix (" << _nOmega << ")" << endl;
+
+  SolveSys(LHS, RHS); // Adjoint means transposed matrix
+  for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
+  {
+    cout << "AdjointLoad[0]: " << RHS[iOmega] << endl;
+  }
+  AdjointLoad = RHS;
 }

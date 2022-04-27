@@ -41,6 +41,16 @@ Point::Point(){
   Force[1] = 0.0;
   Force[2] = 0.0;
 
+  DispAdj = new double[3];
+  DispAdj[0] = 0.0;
+  DispAdj[1] = 0.0;
+  DispAdj[2] = 0.0;
+
+  LoadAdj = new double[3];
+  LoadAdj[0] = 0.0;
+  LoadAdj[1] = 0.0;
+  LoadAdj[2] = 0.0;
+
 }
 
 Point::~Point(){
@@ -87,6 +97,14 @@ double* Point::GetForce() const{
     return Force;
 }
 
+double* Point::GetDisplacementAdjoint() const{
+    return DispAdj;
+}
+
+double* Point::GetLoadAdjoint() const{
+    return LoadAdj;
+}
+
 void Point::PrintCoord() const{
   cout << Coord[0] << " ; " << Coord[1] << " ; " << Coord[2] << endl;
 }
@@ -125,6 +143,18 @@ void Point::SetForce(double* newForce){
     Force[0] = newForce[0];
     Force[1] = newForce[1];
     Force[2] = newForce[2];
+}
+
+void Point::SetDisplacementAdjoint(double* newDispAdj){
+    DispAdj[0] = newDispAdj[0];
+    DispAdj[1] = newDispAdj[1];
+    DispAdj[2] = newDispAdj[2];
+}
+
+void Point::SetLoadAdjoint(double* newLoadAdj){
+    LoadAdj[0] = newLoadAdj[0];
+    LoadAdj[1] = newLoadAdj[1];
+    LoadAdj[2] = newLoadAdj[2];
 }
 
 void Point::UpdateCoord(){

@@ -11,9 +11,6 @@ NativeSolidSolver::NativeSolidSolver(string str, bool FSIComp):confFile(str){
 
   int rank = MASTER_NODE;
 
-  historyFile.open("NativeHistory.dat", ios::out);
-  historyFile2.open("NativeHistoryFSI.dat", ios::out);
-
 /*--- MPI initialization, and buffer setting ---*/
 #ifdef HAVE_MPI
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -24,83 +21,113 @@ NativeSolidSolver::NativeSolidSolver(string str, bool FSIComp):confFile(str){
     else cout << endl <<"***************************** Setting NativeSolid for CSD simulation *****************************" << endl;
   }
 
-    config = NULL;
-    output = NULL;
-    geometry = NULL;
-    structure = NULL;
-    integrator = NULL;
+  config = NULL;
+  output = NULL;
+  geometry = NULL;
+  structure = NULL;
+  integrator = NULL;
 
-    /*--- Initialize the main containers ---*/
-    config = new Config(confFile);
-    output = new Output();
+  /*--- Initialize the main containers ---*/
+  config = new Config(confFile);
+  output = new Output();
 
-    /*--- Read CSD configuration file ---*/
-    cout << endl << "\n----------------------- Reading Native configuration file ----------------------" << endl;
-    config->ReadConfig();
+  /*--- Read CSD configuration file ---*/
+  cout << endl << "\n----------------------- Reading Native configuration file ----------------------" << endl;
+  config->ReadConfig();
 
-    /*--- Read a SU2 native mesh file ---*/
-    cout << endl << "\n----------------------- Reading SU2 based mesh file ----------------------" << endl;
-    geometry = new Geometry(config);
+  /*--- Read a SU2 native mesh file ---*/
+  cout << endl << "\n----------------------- Reading SU2 based mesh file ----------------------" << endl;
+  geometry = new Geometry(config);
 
-    /*--- Initialize structural container and create the structural model ---*/
-    cout << endl << "\n----------------------- Creating the structural model ----------------------" << endl;
-    structure = new Structure(config);
+  /*--- Initialize structural container and create the structural model ---*/
+  cout << endl << "\n----------------------- Creating the structural model ----------------------" << endl;
+  structure = new Structure(config);
 
-    cout << endl << "\n----------------------- Creating the FSI interface ----------------------" << endl;
-    double* Coord;
-    unsigned long iMarker(0), iPoint;
+  cout << endl << "\n----------------------- Creating the FSI interface ----------------------" << endl;
+  double* Coord;
+  unsigned long iMarker(0), iPoint;
 
-    while(iMarker < geometry->GetnMarkers()){
-      if(geometry->GetMarkersMoving(iMarker)){
-        nSolidInterfaceVertex = geometry->nVertex[iMarker];
-      break;
-      }
-      iMarker++;
+  if (config->GetKindProblem() == "ADJOINT"){
+    historyFile.open("NativeHistoryAdjoint.dat", ios::out);
+    historyFile2.open("NativeHistoryAdjointFSI.dat", ios::out);
+  }
+  else{
+    historyFile.open("NativeHistory.dat", ios::out);
+    historyFile2.open("NativeHistoryFSI.dat", ios::out);
+  }
+  
+  
+
+  while(iMarker < geometry->GetnMarkers()){
+    cout << iMarker << " " << geometry->GetMarkersMoving(iMarker) << " " << geometry->GetnMarkers() << endl;
+    if(geometry->GetMarkersMoving(iMarker)){
+      nSolidInterfaceVertex = geometry->nVertex[iMarker];
+    break;
     }
+    iMarker++;
+  }
 
-    varCoordNorm = 0.0;
+  varCoordNorm = 0.0;
 
-    cout << nSolidInterfaceVertex << " nodes on the moving interface have to be tracked." << endl;
+  cout << nSolidInterfaceVertex << " nodes on the moving interface have to be tracked." << endl;
 
-    /*--- Initialize the temporal integrator ---*/
-    cout << endl << "\n----------------------- Setting integration parameter ----------------------" << endl;
-    integrator = new Integration(config, structure);
-    integrator->SetInitialConditions(config, structure);
+  /*--- Initialize the temporal integrator ---*/
+  cout << endl << "\n----------------------- Setting integration parameter ----------------------" << endl;
+  integrator = new Integration(config, structure);
+  integrator->SetInitialConditions(config, structure);
 
-    cout << endl << "\n----------------------- Setting FSI features ----------------------" << endl;
-    q_uM1.Initialize(structure->GetnDof());
-    q_uM1.Reset();
+  cout << endl << "\n----------------------- Setting FSI features ----------------------" << endl;
+  q_uM1.Initialize(structure->GetnDof());
+  q_uM1.Reset();
 
-    if(rank == MASTER_NODE){
-      if(structure->GetnDof() == 1){
-        if(config->GetUnsteady() == "YES" || config->GetUnsteady() == "HARMONIC"){
-          historyFile << fixed
-                      << setw(10) << "Delta_t"
+  if(rank == MASTER_NODE){
+    if(structure->GetnDof() == 1){
+      if((config->GetUnsteady() == "YES" || config->GetUnsteady() == "HARMONIC") && config->GetKindProblem() != "ADJOINT"){
+        historyFile << fixed
+                    << setw(10) << "Delta_t"
+                    << setw(10) << "FSI iter"
+                    << setw(15) << "Displacement"
+                    << setw(15) << "Velocity"
+                    << setw(15) << "Acceleration" << endl;
+        historyFile2 << fixed
+                      << setw(10) << "Time"
                       << setw(10) << "FSI iter"
                       << setw(15) << "Displacement"
                       << setw(15) << "Velocity"
                       << setw(15) << "Acceleration" << endl;
-          historyFile2 << fixed
-                       << setw(10) << "Time"
-                       << setw(10) << "FSI iter"
-                       << setw(15) << "Displacement"
-                       << setw(15) << "Velocity"
-                       << setw(15) << "Acceleration" << endl;
-        }
-        else{
-          historyFile << fixed
-                      << setw(10) << "Delta_t"
+      }
+      else if (config->GetKindProblem() == "ADJOINT"){
+        historyFile << fixed
+                    << setw(10) << "Delta_t"
+                    << setw(10) << "FSI iter"
+                    << setw(15) << "dE/dkh" << endl;
+        historyFile2 << fixed
+                      << setw(10) << "FSI iter"
+                      << setw(15) << "dE/dkh" << endl;
+      }
+      else{
+        historyFile << fixed
+                    << setw(10) << "Delta_t"
+                    << setw(10) << "FSI iter"
+                    << setw(15) << "Displacement" << endl;
+        historyFile2 << fixed
                       << setw(10) << "FSI iter"
                       << setw(15) << "Displacement" << endl;
-          historyFile2 << fixed
-                       << setw(10) << "FSI iter"
-                       << setw(15) << "Displacement" << endl;
-        }
       }
-      else if(structure->GetnDof() == 2){
-        if(config->GetUnsteady() == "YES" || config->GetUnsteady() == "HARMONIC"){
-          historyFile << fixed
-                      << setw(10) << "Delta_t"
+    }
+    else if(structure->GetnDof() == 2){
+      if(config->GetUnsteady() == "YES" || config->GetUnsteady() == "HARMONIC" && config->GetKindProblem() != "ADJOINT"){
+        historyFile << fixed
+                    << setw(10) << "Delta_t"
+                    << setw(10) << "FSI iter"
+                    << setw(15) << "Displacement 1"
+                    << setw(15) << "Displacement 2"
+                    << setw(15) << "Velocity 1"
+                    << setw(15) << "Velocity 2"
+                    << setw(15) << "Acceleration 1"
+                    << setw(15) << "Acceleration 2" << endl;
+        historyFile2 << fixed
+                      << setw(10) << "Time"
                       << setw(10) << "FSI iter"
                       << setw(15) << "Displacement 1"
                       << setw(15) << "Displacement 2"
@@ -108,29 +135,33 @@ NativeSolidSolver::NativeSolidSolver(string str, bool FSIComp):confFile(str){
                       << setw(15) << "Velocity 2"
                       << setw(15) << "Acceleration 1"
                       << setw(15) << "Acceleration 2" << endl;
-          historyFile2 << fixed
-                       << setw(10) << "Time"
-                       << setw(10) << "FSI iter"
-                       << setw(15) << "Displacement 1"
-                       << setw(15) << "Displacement 2"
-                       << setw(15) << "Velocity 1"
-                       << setw(15) << "Velocity 2"
-                       << setw(15) << "Acceleration 1"
-                       << setw(15) << "Acceleration 2" << endl;
-        }
-        else{
-          historyFile << fixed
-                      << setw(10) << "Delta_t"
+      }
+      else if (config->GetKindProblem() == "ADJOINT"){
+        historyFile << fixed
+                    << setw(10) << "Delta_t"
+                    << setw(10) << "FSI iter"
+                    << setw(15) << "Energy"
+                    << setw(15) << "dE/dkh"
+                    << setw(15) << "dE/dka" << endl;
+        historyFile2 << fixed
+                      << setw(10) << "FSI iter"
+                      << setw(15) << "Energy"
+                      << setw(15) << "dE/dkh"
+                      << setw(15) << "dE/dka" << endl;
+      }
+      else{
+        historyFile << fixed
+                    << setw(10) << "Delta_t"
+                    << setw(10) << "FSI iter"
+                    << setw(15) << "Displacement 1"
+                    << setw(15) << "Displacement 2" << endl;
+        historyFile2  << fixed
                       << setw(10) << "FSI iter"
                       << setw(15) << "Displacement 1"
                       << setw(15) << "Displacement 2" << endl;
-          historyFile2  << fixed
-                        << setw(10) << "FSI iter"
-                        << setw(15) << "Displacement 1"
-                        << setw(15) << "Displacement 2" << endl;
-        }
       }
     }
+  }
 
   if(rank == MASTER_NODE){
     if(FSIComp)cout << endl << "***************************** NativeSolid is set for FSI simulation *****************************" << endl;
@@ -672,7 +703,7 @@ void NativeSolidSolver::writeSolution(double currentTime, double lastTime, doubl
   }
 
 
-  if(config->GetUnsteady() == "YES"){
+  if(config->GetUnsteady() == "YES" || config->GetKindProblem() == "ADJOINT"){
   if ( ExtIter%DeltaIter == 0 || ExtIter == NbExtIter ){
     restartFileName = config->GetRestartFile();
     restartFile.open(restartFileName.c_str(), ios::out);
@@ -823,6 +854,119 @@ void NativeSolidSolver::writeSolution(double time, int FSIter){
                      << setw(10) << FSIter
                      << setw(15) << (integrator->GetSolver()->GetDisp())[0]
                      << setw(15) << (integrator->GetSolver()->GetDisp())[1] << endl;
+      }
+    }
+    }
+}
+
+void NativeSolidSolver::writeAdjointSolution(double time, int FSIter){
+
+    int rank = MASTER_NODE;
+
+  #ifdef HAVE_MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  #endif
+
+    if(rank == MASTER_NODE){
+    if(structure->GetnDof() == 1){
+      if(config->GetUnsteady() == "YES"){
+        historyFile2 << fixed
+                     << setw(10) << time
+                     << setw(10) << FSIter
+                     << setw(15) << (integrator->GetSolver()->GetDisp())[0]
+                     << setw(15) << (integrator->GetSolver()->GetVel())[0]
+                     << setw(15) << (integrator->GetSolver()->GetAcc())[0] << endl;
+      }
+      else if(config->GetUnsteady() == "HARMONIC"){
+        double currentTime = 0.;
+        double Energy(0);
+        double h(0), v(0), a(0), dEdkh(0), dRdkh(0), dEdm(0), dRdm(0);
+        unsigned short nInst = 2*getNumberHarmonics()+1;
+
+        for (unsigned short iInst = 0; iInst < nInst ; iInst++){
+          h = (integrator->GetSolver()->GetDisp())[iInst];
+          v = (integrator->GetSolver()->GetVel())[iInst];
+          a = (integrator->GetSolver()->GetAcc())[iInst];
+          dRdkh = h;
+          Energy += .5*(structure->Get_Kh())*h*h;
+          dEdkh += .5*h*h-(integrator->GetSolver()->GetAdjLoads())[iInst]*dRdkh;
+          dRdm = a;
+          dEdm += .5*v*v-(integrator->GetSolver()->GetAdjLoads())[iInst]*dRdm;
+        }
+
+        for (unsigned short iInst = 0; iInst < nInst ; iInst++)
+        {
+          historyFile2 << fixed
+                       << setw(10) << currentTime
+                       << setw(10) << FSIter
+                       << setw(15) << (integrator->GetSolver()->GetDisp())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetVel())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetAcc())[iInst] << endl;
+          currentTime += config->GetStopTime()/nInst;
+        }
+      }
+      else{
+        double Energy(0);
+        double h(0), dEdkh(0), dRdkh(0);
+        h = (integrator->GetSolver()->GetDisp())[0];
+        dRdkh = h;
+        Energy += .5*(structure->Get_Kh())*h*h;
+        dEdkh = .5*h*h-(integrator->GetSolver()->GetAdjLoads())[0]*dRdkh;
+        historyFile2 << fixed
+                     << setw(10) << FSIter
+                     << setw(15) << Energy
+                     << setw(15) << dEdkh << endl;
+      }
+    }
+    else if(structure->GetnDof() == 2){
+      if(config->GetUnsteady() == "YES"){
+        historyFile2 << fixed
+                     << setw(10) << time
+                     << setw(10) << FSIter
+                     << setw(15) << (integrator->GetSolver()->GetDisp())[0]
+                     << setw(15) << (integrator->GetSolver()->GetDisp())[1]
+                     << setw(15) << (integrator->GetSolver()->GetVel())[0]
+                     << setw(15) << (integrator->GetSolver()->GetVel())[1]
+                     << setw(15) << (integrator->GetSolver()->GetAcc())[0]
+                     << setw(15) << (integrator->GetSolver()->GetAcc())[1] << endl;
+      }
+      else if(config->GetUnsteady() == "HARMONIC"){
+        double currentTime = 0.;
+        unsigned short nInst = 2*getNumberHarmonics()+1;
+        for (unsigned short iInst = 0; iInst < nInst ; iInst++)
+        {
+          historyFile2 << fixed
+                       << setw(10) << currentTime
+                       << setw(10) << FSIter
+                       << setw(15) << (integrator->GetSolver()->GetDisp())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetDisp())[iInst+nInst]
+                       << setw(15) << (integrator->GetSolver()->GetVel())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetVel())[iInst+nInst]
+                       << setw(15) << (integrator->GetSolver()->GetAcc())[iInst]
+                       << setw(15) << (integrator->GetSolver()->GetAcc())[iInst+nInst]
+                       << setw(15) << (integrator->GetSolver()->GetL2Norm())
+                       << setw(15) << (integrator->GetSolver()->GetdL2dwNorm())
+                       << setw(15) << (integrator->GetSolver()->GetOmega()) << endl;
+          currentTime += config->GetStopTime()/nInst;
+        }
+      }
+      else{
+        double Energy(0);
+        double h(0), dEdkh(0), dRdkh(0);
+        double alpha(0), dEdka(0), dRdka(0);
+        h = (integrator->GetSolver()->GetDisp())[0];
+        dRdkh = h;
+        dEdkh = .5*h*h-(integrator->GetSolver()->GetAdjLoads())[0]*dRdkh;
+        alpha = (integrator->GetSolver()->GetDisp())[1];
+        dRdka = alpha;
+        dEdka = .5*alpha*alpha-(integrator->GetSolver()->GetAdjLoads())[1]*dRdka;
+        Energy += .5*(structure->Get_Kh())*h*h;
+        Energy += .5*(structure->Get_Ka())*alpha*alpha;
+        historyFile2 << fixed
+                     << setw(10) << FSIter
+                     << setw(15) << Energy
+                     << setw(15) << dEdkh
+                     << setw(15) << dEdka << endl;
       }
     }
     }
@@ -1158,6 +1302,73 @@ void NativeSolidSolver::setGeneralisedMoment(double M){
   }
 }
 
+void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
+
+  unsigned short iVertex, iMarker;
+  unsigned long iPoint;
+  double AdjDispX(0.0), AdjDispY(0.0), AdjDispZ(0.0);
+  double CenterX, CenterY, CenterZ;
+  double* ExtAdjointDisp;
+  double* Coord;
+  double dPsi(0.0), sinPsi(0.0), cosPsi(1.0);
+  unsigned int offset = instance*structure->GetnDof();
+  
+  if (config->GetStructType() == "AIRFOIL")
+  {
+    dPsi = -(integrator->GetSolver()->GetDisp())[offset+1];
+    sinPsi = sin(dPsi);
+    cosPsi = cos(dPsi);
+  }
+  
+
+  iMarker = getFSIMarkerID();
+  CenterX = getRotationCenterPosX();
+  CenterY = getRotationCenterPosY();
+  for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
+      iPoint = geometry->vertex[iMarker][iVertex];
+      ExtAdjointDisp = geometry->node[iPoint]->GetDisplacementAdjoint();
+      AdjDispX += ExtAdjointDisp[0]; // -dx/dx*lambda_x
+      AdjDispY += ExtAdjointDisp[1]; // -dy/dy*lambda_y
+      Coord = geometry->node[iPoint]->GetCoord();
+      AdjDispZ += ExtAdjointDisp[0]*((Coord[0]-CenterX)*sinPsi - (Coord[1]-CenterY)*cosPsi); // rotation <- z, this is -dx/dPsi*lambda_x
+      AdjDispZ += ExtAdjointDisp[1]*((Coord[1]-CenterY)*sinPsi + (Coord[0]-CenterX)*cosPsi); // rotation <- z, this is -dy/dPsi*lambda_y
+  }
+
+  if (config->GetObjFunction() == "ENERGY")
+  {
+    AdjDispX += structure->Get_Kh()*integrator->GetSolver()->GetDisp()[offset];
+    AdjDispY += structure->Get_Kh()*integrator->GetSolver()->GetDisp()[offset];
+    if (structure->GetnDof() == 2)
+    {
+      AdjDispZ -= structure->Get_Ka()*dPsi;
+    }
+    
+  }
+  
+
+
+  cout << "Instance: " << instance << endl;
+  cout << "AdjDispX: " << AdjDispX << endl;
+  cout << "AdjDispY: " << AdjDispY << endl;
+  cout << "AdjDispZ: " << AdjDispZ << endl;
+
+  if(config->GetStructType() == "AIRFOIL"){
+    (integrator->GetSolver()->GetAdjDisps())[offset]   = AdjDispY;
+    (integrator->GetSolver()->GetAdjDisps())[offset+1] = AdjDispZ;
+  }
+  else if(config->GetStructType() == "SPRING_VER"){
+    (integrator->GetSolver()->GetAdjDisps())[offset] = AdjDispY;
+  }
+  else if(config->GetStructType() == "SPRING_HOR"){
+    (integrator->GetSolver()->GetAdjDisps())[offset] = AdjDispX;
+  }
+  else{
+    cerr << "Wrong structural type for applying global fluid loads !" << endl;
+    throw(-1);
+  }
+
+}
+
 void NativeSolidSolver::applyload(unsigned short iVertex, double Fx, double Fy, double Fz){
 
     unsigned short iMarker;
@@ -1184,4 +1395,136 @@ void NativeSolidSolver::applypitch(unsigned int iHarmonic, double alpha){
 
 unsigned int NativeSolidSolver::getNumberHarmonics(){
     return config->GetNumberHarmonics();
+}
+
+void NativeSolidSolver::applyDisplacementAdjoint(unsigned short iVertex, double Dx, double Dy, double Dz){
+  if (config->GetKindProblem() == "ADJOINT")
+  {
+    unsigned short iMarker;
+    unsigned long iPoint;
+    double DispAdj[3];
+
+    DispAdj[0] = Dx;
+    DispAdj[1] = Dy;
+    DispAdj[2] = Dz;
+
+    iMarker = getFSIMarkerID();
+    iPoint = geometry->vertex[iMarker][iVertex];
+    geometry->node[iPoint]->SetDisplacementAdjoint(DispAdj);
+  }
+  
+}
+
+double NativeSolidSolver::getLoadAdjointX(unsigned short iVertex){
+  if (config->GetKindProblem() == "ADJOINT")
+  {
+    unsigned short iMarker;
+    unsigned long iPoint;
+    double *LoadAdjoint;
+    iMarker = getFSIMarkerID();
+    iPoint = geometry->vertex[iMarker][iVertex];
+    LoadAdjoint = geometry->node[iPoint]->GetLoadAdjoint();
+    return LoadAdjoint[0];
+  }
+  else {
+    return 0.;
+  }
+}
+
+double NativeSolidSolver::getLoadAdjointY(unsigned short iVertex){
+  if (config->GetKindProblem() == "ADJOINT")
+  {
+    unsigned short iMarker;
+    unsigned long iPoint;
+    double *LoadAdjoint;
+    iMarker = getFSIMarkerID();
+    iPoint = geometry->vertex[iMarker][iVertex];
+    LoadAdjoint = geometry->node[iPoint]->GetLoadAdjoint();
+    return LoadAdjoint[1];
+  }
+  else {
+    return 0.;
+  }
+}
+
+double NativeSolidSolver::getLoadAdjointZ(unsigned short iVertex){
+  if (config->GetKindProblem() == "ADJOINT")
+  {
+    unsigned short iMarker;
+    unsigned long iPoint;
+    double *LoadAdjoint;
+    iMarker = getFSIMarkerID();
+    iPoint = geometry->vertex[iMarker][iVertex];
+    LoadAdjoint = geometry->node[iPoint]->GetLoadAdjoint();
+    return LoadAdjoint[2];
+  }
+  else {
+    return 0.;
+  }
+}
+
+void NativeSolidSolver::computeInterfaceAdjointLoads(){
+
+    double *Coord, Center[3], AdjointLoad[3];
+    unsigned short iMarker, iVertex, nDim(3);
+    unsigned long iPoint;
+    CVector AdjLoads = integrator->GetSolver()->GetAdjLoads();
+
+    /*--- Get the current center of rotation (can vary at each iteration) ---*/
+    Center[0] = structure->GetCenterOfRotation_x();
+    Center[1] = structure->GetCenterOfRotation_y();
+    Center[2] = structure->GetCenterOfRotation_z();
+    cout << "AdjLoads[0]: " << AdjLoads[0] << " AdjLoads[1]: " << AdjLoads[1] << endl;
+    for(iMarker = 0; iMarker < geometry->GetnMarkers(); iMarker++){
+      if (geometry->markersMoving[iMarker] == true){
+        for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
+          AdjointLoad[0] = 0.0;
+          AdjointLoad[1] = 0.0;
+          AdjointLoad[2] = 0.0;
+          iPoint = geometry->vertex[iMarker][iVertex];
+          Coord = geometry->node[iPoint]->GetCoord();
+          AdjointLoad[0] += AdjLoads[0]*(Center[1]-Coord[1]); // Dependence of pitch eq. on X axis forces
+          AdjointLoad[1] += AdjLoads[1]*(Center[0]-Coord[0]); // Dependence of pitch eq. on Y axis forces
+          AdjointLoad[1] -= AdjLoads[0]; // TODO: Check signs // Dependence of plunge eq. on Y axis forces
+          geometry->node[iPoint]->SetLoadAdjoint(AdjointLoad);
+        }
+      }
+    }
+
+}
+
+void NativeSolidSolver::computeInterfaceAdjointLoads(unsigned int instance){
+
+    double *Coord, Center[3], AdjointLoad[3];
+    unsigned short iMarker, iVertex, nDim(3);
+    unsigned int offset = instance*structure->GetnDof();
+    unsigned long iPoint;
+    CVector AdjLoads = integrator->GetSolver()->GetAdjLoads();
+
+    /*--- Get the current
+     center of rotation (can vary at each iteration) ---*/
+    Center[0] = structure->GetCenterOfRotation_x();
+    Center[1] = structure->GetCenterOfRotation_y();
+    Center[2] = structure->GetCenterOfRotation_z();
+    cout << "Offset: " << offset << " AdjLoads[0]: " << AdjLoads[0+offset];
+    if (structure->GetnDof()==2) cout << " AdjLoads[1]: " << AdjLoads[1+offset];
+    cout << endl;
+    for(iMarker = 0; iMarker < geometry->GetnMarkers(); iMarker++){
+      if (geometry->markersMoving[iMarker] == true){
+        for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
+          AdjointLoad[0] = 0.0;
+          AdjointLoad[1] = 0.0;
+          AdjointLoad[2] = 0.0;
+          iPoint = geometry->vertex[iMarker][iVertex];
+          Coord = geometry->node[iPoint]->GetCoord();
+          if (structure->GetnDof()==2){
+            AdjointLoad[0] += AdjLoads[0+offset]*(Center[1]-Coord[1]); // Dependence of pitch eq. on X axis forces
+            AdjointLoad[1] += AdjLoads[1+offset]*(Center[0]-Coord[0]); // Dependence of pitch eq. on Y axis forces
+          }
+          AdjointLoad[1] -= AdjLoads[0+offset]; // TODO: Check signs // Dependence of plunge eq. on Y axis forces
+          geometry->node[iPoint]->SetLoadAdjoint(AdjointLoad);
+        }
+      }
+    }
+
 }

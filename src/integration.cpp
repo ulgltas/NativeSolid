@@ -16,21 +16,32 @@ Integration::Integration(Config *config, Structure *structure){
 
   linear = (config->GetLinearize()) == "YES";
 
-  if (config->GetUnsteady() == "YES") {
-    if(config->GetIntegrationAlgo() == "ALPHAGEN"){
-      solver = new AlphaGenSolver(structure->GetnDof(), config->GetRho(), linear);
+  if (config->GetKindProblem() == "ADJOINT") {
+    if (config->GetUnsteady() == "YES"){}
+    else if (config->GetUnsteady() == "HARMONIC") {
+      solver = new AdjointHarmonicSolver(structure->GetnDof(), config->GetNumberHarmonics(), linear);
     }
-    else if(config->GetIntegrationAlgo() == "RK4"){
-      solver = new RK4Solver(structure->GetnDof(), linear);
-    }
-    else{
+    else {
+      solver = new AdjointStaticSolver(structure->GetnDof(), linear);
     }
   }
-  else if (config->GetUnsteady() == "HARMONIC"){
-    solver = new HarmonicSolver(structure->GetnDof(), config->GetNumberHarmonics(), linear);
+  else {
+    if (config->GetUnsteady() == "YES") {
+      if(config->GetIntegrationAlgo() == "ALPHAGEN"){
+        solver = new AlphaGenSolver(structure->GetnDof(), config->GetRho(), linear);
+      }
+      else if(config->GetIntegrationAlgo() == "RK4"){
+        solver = new RK4Solver(structure->GetnDof(), linear);
+      }
+      else{
+      }
+    }
+    else if (config->GetUnsteady() == "HARMONIC"){
+      solver = new HarmonicSolver(structure->GetnDof(), config->GetNumberHarmonics(), linear);
+    }
+    else
+      solver = new StaticSolver(structure->GetnDof(), linear);
   }
-  else
-    solver = new StaticSolver(structure->GetnDof(), linear);
 }
 
 Integration::~Integration(){

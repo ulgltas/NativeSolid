@@ -41,11 +41,14 @@ public:
     //void mapRigidBodyMotion(bool predicition, bool initialize);
     void computeInterfacePosVel(bool initialize);
     void computeInterfacePosVel(bool initialize, unsigned int instance);
+    void computeInterfaceAdjointLoads();
+    void computeInterfaceAdjointLoads(unsigned int instance);
     void setInitialDisplacements();
     void staticComputation();
     void harmonicComputation();
     void writeSolution(double currentTime, double lastTime, double currentFSIIter, unsigned long ExtIter, unsigned long NbExtIter);
     void writeSolution(double time, int FSIter);
+    void writeAdjointSolution(double time, int FSIter);
     void saveSolution();
     void updateSolution();
     //void updateGeometry();
@@ -82,4 +85,9 @@ public:
     inline double GetL2Norm() {return integrator->GetSolver()->GetL2Norm();}
     inline double GetdL2dwNorm() {return integrator->GetSolver()->GetdL2dwNorm();}
     inline void setOmega(double val_omega) {integrator->GetSolver()->SetOmega(val_omega);}
+    void applyDisplacementAdjoint(unsigned short iVertex, double Dx, double Dy, double Dz);
+    double getLoadAdjointX(unsigned short iVertex);
+    double getLoadAdjointY(unsigned short iVertex);
+    double getLoadAdjointZ(unsigned short iVertex);
+    void setTotalAdjointDisplacement(unsigned int instance);
 };

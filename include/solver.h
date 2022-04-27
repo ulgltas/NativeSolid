@@ -35,12 +35,14 @@ public:
     virtual CVector & GetLoads();
     virtual CVector & GetAccVar();
     virtual CVector & GetAccVar_n();
+    virtual CVector & GetAdjLoads();
+    virtual CVector & GetAdjDisps();
     virtual void ResetSolution();
     virtual void SaveToThePast();
     virtual void SetInitialState(Config *config, Structure* structure);
     virtual void SetStateLoads(unsigned int iInstance, double load);
     virtual void SetStates(unsigned int iInstance, unsigned int dof,  double displacement);
-    inline double GetL2Norm() {std::cout << L2norm << std::endl;return L2norm;}
+    inline double GetL2Norm() {return L2norm;}
     inline double GetdL2dwNorm() {return dL2dwnorm;}
     virtual void SetOmega(double val_omega) {};
     virtual double GetOmega() {return 0.;};
@@ -134,3 +136,28 @@ public:
     /*inline double GetL2Norm() {std::cout << L2norm << std::endl; return L2norm;}
     inline double GetdL2dwNorm() {return dL2dwnorm;}*/
 };
+
+class AdjointStaticSolver : public StaticSolver {
+protected:
+    CVector Adjointq;
+    CVector AdjointLoad;
+public:
+    AdjointStaticSolver(unsigned nDof, bool bool_linear);
+    ~AdjointStaticSolver();
+    inline CVector & GetAdjLoads() {return AdjointLoad;};
+    inline CVector & GetAdjDisps() {return Adjointq;};
+    virtual void Iterate(double &t0, double &tf, Structure* structure);
+};
+
+class AdjointHarmonicSolver : public HarmonicSolver {
+protected:
+    CVector Adjointq;
+    CVector AdjointLoad;
+public:
+    AdjointHarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_linear);
+    ~AdjointHarmonicSolver();
+    inline CVector & GetAdjLoads() {return AdjointLoad;};
+    inline CVector & GetAdjDisps() {return Adjointq;};
+    virtual void Iterate(double &t0, double &tf, Structure* structure);
+};
+

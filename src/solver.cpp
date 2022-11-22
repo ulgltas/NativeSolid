@@ -970,7 +970,7 @@ void HarmonicSolver::SetStates(unsigned int iInstance, unsigned int DoF, double 
 AdjointStaticSolver::AdjointStaticSolver(unsigned nDof, bool bool_linear) : StaticSolver(nDof, bool_linear)
 {
   _nDof = nDof;
-  Adjointq.Initialize(_nDof, 0.0);
+  qDerivative.Initialize(_nDof, 0.0);
   AdjointLoad.Initialize(_nDof, 0.);
 }
 
@@ -981,14 +981,13 @@ AdjointStaticSolver::~AdjointStaticSolver()
 
 void AdjointStaticSolver::Iterate(double &t0, double &tf, Structure* structure)
 {
-  // Solve KK*AdjointLoad = Adjointq
+  // Solve KK*AdjointLoad = qDerivative
   CVector RHS(_nDof, 0.);
-  int INFO; 
   
-  RHS += Adjointq;
-  INFO=SolveSys(KK, RHS); // Adjoint means transposed matrix
+  RHS += qDerivative;
+  SolveSys(KK, RHS); // Adjoint means transposed matrix but stiffness is diagonal
   AdjointLoad = RHS;
-  //cout << INFO << endl;
+
   for (unsigned int i = 0; i < _nDof; i++)
   {
     for (unsigned int j = 0; j < _nDof; j++){
@@ -1003,14 +1002,23 @@ void AdjointStaticSolver::Iterate(double &t0, double &tf, Structure* structure)
   
 }
 
+double AdjointStaticSolver::GetStiffnessDerivative(unsigned int dof){
+  double dJdk = 0.;
+  return dJdk;
+}
+
 /*CLASS ADJOINTHARMONICSOLVER*/
 AdjointHarmonicSolver::AdjointHarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_linear) : HarmonicSolver(nDof, nHarmonic, bool_linear)
 {
   _nDof = nDof;
   _nOmega = 2*nHarmonic+1;
+  AdjointOmega = 0.0;
   cout << "nHarmonic: " << nHarmonic << endl;
-  Adjointq.Initialize(_nDof*_nOmega, 0.0);
+  qDerivative.Initialize(_nDof*_nOmega, 0.0);
   AdjointLoad.Initialize(_nDof*_nOmega, 0.);
+  LoadGradient.Initialize(_nOmega, _nOmega, 0.);
+  ET.Initialize(_nOmega, _nOmega, 0.0);
+  Em1T.Initialize(_nOmega, _nOmega, 1.0);
 }
 
 AdjointHarmonicSolver::~AdjointHarmonicSolver()
@@ -1018,64 +1026,254 @@ AdjointHarmonicSolver::~AdjointHarmonicSolver()
   std::cout << "NativeSolid::~AdjointHarmonicSolver()" << std::endl;
 }
 
-void AdjointHarmonicSolver::Iterate(double &t0, double &tf, Structure* structure)
-{
-  // Solve KK*AdjointLoad = Adjointq
-  CVector RHS(_nDof*_nOmega, 0.);
-  CMatrix LHS(_nDof*_nOmega, _nDof*_nOmega, 0.0);
+void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
+  unsigned int _nTotal = _nDof*_nOmega;
+  unsigned int fDoF = _nOmega+2; // DoF to be fixed to 0
+  unsigned int counter;
 
-  CMatrix MM(_nDof*_nOmega, _nDof*_nOmega, 0.0);
-  CMatrix CC(_nDof*_nOmega, _nDof*_nOmega, 0.0);
-  CMatrix KK(_nDof*_nOmega, _nDof*_nOmega, 0.0);
+  CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain
+  CVector qdot_temp(_nOmega, 0.0);
+  CVector f_temp(_nOmega, 0.0);
+  CVector temp_hold(_nOmega, 0.0); // Temporary hold for the frequency domain things
 
-  RHS += Adjointq;
+  CVector x_temp(2*_nTotal, 0.0); // Old & new? solution of the state-space problem in the frequency domain
+  CVector RHS(2*_nTotal, 0.0); // Load vector
+  CVector Res(2*_nTotal, 0.0); // Residual vector
+  CMatrix MM(2*_nTotal, 2*_nTotal, 0.0);
+  CMatrix KK(2*_nTotal, 2*_nTotal, 0.0);
+  CMatrix AAA(2*_nTotal, 2*_nTotal, 0.0); // Frequency derivative matrix
+  CMatrix LHS(2*_nTotal, 2*_nTotal, 0.0);
+  CMatrix dRes(2*_nTotal, 2*_nTotal, 0.0);
+  CMatrix Aux(2*_nTotal, 2*_nTotal, 0.0);
+  CVector dResdw(2*_nTotal, 0.0);
 
   for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
   {
-    cout << "RHS[0]: " << RHS[iOmega] << endl;
-    KK.SetElm(iOmega+1, iOmega+1, structure->Get_Kh());
+    KK.SetElm(_nTotal+iOmega+1, iOmega+1, structure->Get_Kh());
+    KK.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1, structure->Get_Ch());
+    KK.SetElm(iOmega+1, _nTotal+iOmega+1, -1.);
+
+    MM.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1, structure->Get_m());
+    MM.SetElm(iOmega+1, iOmega+1, 1.);
+
     if (_nDof == 2)
     {
-      KK.SetElm(iOmega+1+_nOmega, iOmega+1+_nOmega, structure->Get_Ka());
+      KK.SetElm(_nTotal+iOmega+1+_nOmega, iOmega+1+_nOmega, structure->Get_Ka());
+      KK.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, structure->Get_Ca());
+      KK.SetElm(iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, -1.);
+
+      MM.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, structure->Get_If());
+      MM.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1+_nOmega, structure->Get_S());
+      MM.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1, structure->Get_S());
+      MM.SetElm(iOmega+1+_nOmega, iOmega+1+_nOmega, 1.);
     }
+  }
+
+  for (int iHarmonic = 1; iHarmonic <= _nHarmonic; iHarmonic++){ // It... is signed down there. Option: iHarmonic*-1.0. Not that anybody will use that many harmonics!
+    AAA.SetElm(2*iHarmonic+1, 2*iHarmonic, -iHarmonic*1.0);
+    AAA.SetElm(2*iHarmonic, 2*iHarmonic+1, iHarmonic*1.0);
+    // For the dot ones
+    AAA.SetElm(2*iHarmonic+1+_nTotal, 2*iHarmonic+_nTotal, -iHarmonic*1.0);
+    AAA.SetElm(2*iHarmonic+_nTotal, 2*iHarmonic+1+_nTotal, iHarmonic*1.0);
+    if (_nDof == 2)
+    {
+      AAA.SetElm(2*iHarmonic+1+_nOmega, 2*iHarmonic+_nOmega, -iHarmonic*1.0);
+      AAA.SetElm(2*iHarmonic+_nOmega, 2*iHarmonic+1+_nOmega, iHarmonic*1.0);
+      // For the dot ones
+      AAA.SetElm(2*iHarmonic+1+_nTotal+_nOmega, 2*iHarmonic+_nTotal+_nOmega, -iHarmonic*1.0);
+      AAA.SetElm(2*iHarmonic+_nTotal+_nOmega, 2*iHarmonic+1+_nTotal+_nOmega, iHarmonic*1.0);
+    }
+  }
+
+  for (unsigned int iDof = 0; iDof < _nDof; iDof++)
+  {
+    unsigned int dofStart = iDof*_nOmega;
     for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
     {
-      MM.SetElm(iOmega+1, jOmega+1, structure->Get_m()*d2.GetElm(jOmega+1, iOmega+1));
-      CC.SetElm(iOmega+1, jOmega+1, structure->Get_Ch()*d.GetElm(jOmega+1, iOmega+1));
+      q_temp[jOmega] = q[jOmega+dofStart];
+      qdot_temp[jOmega] = qdot[jOmega+dofStart];
+      f_temp[jOmega] = qDerivative[jOmega+dofStart];
+    }
+    temp_hold = MatVecProd(E, q_temp);
+    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    {
+      x_temp[jOmega+dofStart] = temp_hold[jOmega];
+    }
+    temp_hold = MatVecProd(E, qdot_temp);
+    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    {
+      x_temp[jOmega+dofStart+_nTotal] = temp_hold[jOmega];
+    }
+    temp_hold = MatVecProd(Em1T, f_temp);
+    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    {
+      RHS[jOmega+dofStart+_nTotal] = temp_hold[jOmega];
+    }
+  }
+
+  if (_nDof == 2)
+  {
+    CMatrix LoadGradientFr;
+    LoadGradientFr.Initialize(_nOmega, _nOmega, 0.);
+    LoadGradientFr = MatMatProd(LoadGradient, Em1);
+    LoadGradientFr = MatMatProd(E, LoadGradientFr);
+    for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
+    {
+      for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+      {
+        KK.SetElm(iOmega+1+_nOmega+_nTotal, jOmega+1+_nOmega, KK.GetElm(iOmega+1+_nOmega+_nTotal, jOmega+1+_nOmega)+LoadGradientFr.GetElm(iOmega+1, jOmega+1));
+      }
+    }
+  }
+
+  Aux = MatMatProd(MM, AAA);
+  LHS = omega*Aux;
+  LHS += KK;
+  dResdw = MatVecProd(Aux, x_temp);
+
+  counter = 0;
+  for (unsigned int i = 0; i < 2*_nTotal; i++)
+  {
+    dRes.SetElm(2*_nTotal, i+1, dResdw[i]);
+    if (i == fDoF)
+    {
+      continue;
+    }
+    for (unsigned int j = 0; j < 2*_nTotal; j++)
+    {
+      dRes.SetElm(counter+1, j+1, LHS.GetElm(j+1, i+1)); // Filled with transposed elements
+    }
+    counter++;
+  }
+  counter = 0;
+  for (unsigned int i = 0; i < _nTotal; i++)
+  {
+    if (i == fDoF)
+    {
+      continue;
+    }
+    Res[counter] = RHS[i+_nTotal];
+    counter++;
+  }
+  Res[2*_nTotal-1] = AdjointOmega;
+
+  SolveSys(dRes, Res);
+
+  counter = _nTotal; // The force is applied to the lower equations
+  for (unsigned int iDof = 0; iDof < _nDof; iDof++)
+  {
+    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    {
+      temp_hold[jOmega] = Res[counter];
+      counter++;
+    }
+    q_temp = MatVecProd(ET, temp_hold);
+    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    {
+      AdjointLoad[jOmega+iDof*_nOmega] = q_temp[jOmega]; // dS/df = -1! Loads are positive on the right hand side
+    }
+  }
+}
+
+void AdjointHarmonicSolver::SetHBMatrices(){
+  cout <<  "AdjointHarmonicSolver::SetHBMatrices()" << endl;
+  E.Reset();
+  ET.Reset();
+  for (unsigned short i = 1; i <= _nOmega; i++)
+  {
+    E.SetElm(i,i,1.0);
+    ET.SetElm(i, i, 1.0);
+  }
+  
+
+  for (unsigned short i = 1; i <= _nHarmonic; i++){
+    AA.SetElm(2*i+1, 2*i, -omega*i);
+    AA.SetElm(2*i, 2*i+1, omega*i);
+    for (unsigned short j = 0; j < _nOmega; j++)
+    {
+      Em1.SetElm(j+1, 2*i, cos(2*M_PI*j/_nOmega*i));
+      Em1.SetElm(j+1, 2*i+1, sin(2*M_PI*j/_nOmega*i));
+      Em1T.SetElm(2*i, j+1, cos(2*M_PI*j/_nOmega*i));
+      Em1T.SetElm(2*i+1, j+1, sin(2*M_PI*j/_nOmega*i));
+    }
+  }
+
+  SolveSys(Em1, E);
+  SolveSys(Em1T, ET);
+  d = MatMatProd(AA, E);
+  d = MatMatProd(Em1, d);
+  d2 = MatMatProd(d, d);
+}
+
+double AdjointHarmonicSolver::GetStiffnessDerivative(unsigned int dof){
+  double dJdk = 0.;
+  CVector dSdk(_nDof*_nOmega, 0.0);
+  
+  if (dof < _nDof)
+  {
+    for (unsigned int i = 0; i < _nOmega; i++)
+    {
+      dSdk[i+dof*_nOmega] = q[i+dof*_nOmega];
+    }
+    dJdk -= AdjointLoad.dotProd(dSdk); // Order does not matter for scalars
+  }
+  
+  return dJdk;
+}
+
+double AdjointHarmonicSolver::GetDampingDerivative(unsigned int dof){
+  double dJdc = 0.;
+  CVector dSdc(_nDof*_nOmega, 0.0);
+
+  if (dof < _nDof)
+  {
+    for (unsigned int i = 0; i < _nOmega; i++)
+    {
+      dSdc[i+dof*_nOmega] = qdot[i+dof*_nOmega];
+    }
+    dJdc -= AdjointLoad.dotProd(dSdc); // Order does not matter for scalars
+  }
+  return dJdc;
+}
+
+double AdjointHarmonicSolver::GetMassDerivative(unsigned int dof){
+  double dJdm = 0.;
+  CVector dSdm(_nDof*_nOmega, 0.0);
+
+  if (dof == 0)
+  {
+    for (unsigned int i = 0; i < _nOmega; i++)
+    {
+      dSdm[i] += qddot[i];
+    }
+  }
+  else if (dof == 1 && _nDof == 2)
+  {
+    for (unsigned int i = 0; i < _nOmega; i++)
+    {
+      dSdm[i+_nOmega] = qddot[i+_nOmega];
+    }
+  }
+  
+  dJdm -= AdjointLoad.dotProd(dSdm); // Order does not matter for scalars
+  return dJdm;
+}
+
+double AdjointHarmonicSolver::GetImbalanceDerivative(){
+  double dJdS = 0.;
+  CVector dSdS(_nDof*_nOmega, 0.0);
+
+  if (_nDof == 2)
+  {
+    for (unsigned int i = 0; i < _nOmega; i++)
+    {
       if (_nDof == 2)
       {
-        MM.SetElm(iOmega+1+_nOmega, jOmega+1+_nOmega, structure->Get_If()*d2.GetElm(jOmega+1, iOmega+1));
-        MM.SetElm(iOmega+1        , jOmega+1+_nOmega, structure->Get_S()*d2.GetElm(jOmega+1, iOmega+1));
-        MM.SetElm(iOmega+1+_nOmega, jOmega+1        , structure->Get_S()*d2.GetElm(jOmega+1, iOmega+1));
-        CC.SetElm(iOmega+1+_nOmega, jOmega+1+_nOmega, structure->Get_Ca()*d.GetElm(jOmega+1, iOmega+1));
+        dSdS[i+_nOmega] += qddot[i];
+        dSdS[i] += qddot[i+_nOmega]; //TODO: Remove hardcoding but I need the structure boo
       }
-      
     }
-    
   }
-
-  LHS += MM;
-  LHS += CC;
-  LHS += KK;
-  cout << "LHS Matrix (" << _nOmega << ")" << endl;
-  /*for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++){
-    cout << LHS.GetElm(iOmega+1, 1) << endl;
-  }*/
-  for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
-  {
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      cout << LHS.GetElm(iOmega+1, jOmega+1) << "\t";
-    }
-    cout << endl;
-  }
-
-  cout << "LHS Matrix (" << _nOmega << ")" << endl;
-
-  SolveSys(LHS, RHS); // Adjoint means transposed matrix
-  for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
-  {
-    cout << "AdjointLoad[0]: " << RHS[iOmega] << endl;
-  }
-  AdjointLoad = RHS;
+  dJdS -= AdjointLoad.dotProd(dSdS); // Order does not matter for scalars
+  return dJdS;
 }

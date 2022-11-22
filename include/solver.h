@@ -40,8 +40,14 @@ public:
     virtual void SetInitialState(Config *config, Structure* structure);
     virtual void SetStates(unsigned int iInstance, unsigned int dof,  double displacement);
     virtual void SetOmega(double val_omega) {};
+    virtual void SetFrequencyDerivative(double val_djdw) {};
+    virtual void SetLoadGradient(unsigned int dof, double val_dfdq) {};
     virtual double GetOmega() {return 0.;};
-
+    virtual double GetDeltaOmega() {return 0.;};
+    virtual double GetStiffnessDerivative(unsigned int dof) {return 0.;}
+    virtual double GetDampingDerivative(unsigned int dof) {return 0.;}
+    virtual double GetMassDerivative(unsigned int dof) {return 0.;}
+    virtual double GetImbalanceDerivative() {return 0.;}
 };
 
 class AlphaGenSolver : public Solver {
@@ -133,25 +139,37 @@ public:
 
 class AdjointStaticSolver : public StaticSolver {
 protected:
-    CVector Adjointq;
+    CVector qDerivative;
     CVector AdjointLoad;
 public:
     AdjointStaticSolver(unsigned nDof, bool bool_linear);
     ~AdjointStaticSolver();
     inline CVector & GetAdjLoads() {return AdjointLoad;};
-    inline CVector & GetAdjDisps() {return Adjointq;};
+    inline CVector & GetAdjDisps() {return qDerivative;};
     virtual void Iterate(double &t0, double &tf, Structure* structure);
+    double GetStiffnessDerivative(unsigned int dof);
 };
 
 class AdjointHarmonicSolver : public HarmonicSolver {
 protected:
-    CVector Adjointq;
-    CVector AdjointLoad;
+    CVector qDerivative; // Derivatives with respect to each time step's displacement
+    CVector AdjointLoad; // Adjoint variables for each equation
+    CMatrix LoadGradient; // Gradient of load with respect to degree of freedom
+    CMatrix ET; // Harmonic balance transposed DFT matrix
+    CMatrix Em1T; // Harmonic balance transposed IFT matrix
+    double AdjointOmega; // Adjoint variable related to d/dOmega
 public:
     AdjointHarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_linear);
     ~AdjointHarmonicSolver();
+    virtual void SetHBMatrices();
     inline CVector & GetAdjLoads() {return AdjointLoad;};
-    inline CVector & GetAdjDisps() {return Adjointq;};
+    inline CVector & GetAdjDisps() {return qDerivative;};
+    inline void SetFrequencyDerivative(double val_djdw) {AdjointOmega = val_djdw;};
+    inline void SetLoadGradient(unsigned int dof, double val_dfdq) {LoadGradient.SetElm(dof+1, dof+1, val_dfdq);};
     virtual void Iterate(double &t0, double &tf, Structure* structure);
+    double GetStiffnessDerivative(unsigned int dof);
+    double GetDampingDerivative(unsigned int dof);
+    double GetMassDerivative(unsigned int dof);
+    double GetImbalanceDerivative();
 };
 

@@ -46,10 +46,10 @@ Point::Point(){
   DispAdj[1] = 0.0;
   DispAdj[2] = 0.0;
 
-  LoadAdj = new double[3];
-  LoadAdj[0] = 0.0;
-  LoadAdj[1] = 0.0;
-  LoadAdj[2] = 0.0;
+  LoadDerivative = new double[3];
+  LoadDerivative[0] = 0.0;
+  LoadDerivative[1] = 0.0;
+  LoadDerivative[2] = 0.0;
 
 }
 
@@ -101,8 +101,8 @@ double* Point::GetDisplacementAdjoint() const{
     return DispAdj;
 }
 
-double* Point::GetLoadAdjoint() const{
-    return LoadAdj;
+double* Point::GetLoadDerivative() const{
+    return LoadDerivative;
 }
 
 void Point::PrintCoord() const{
@@ -151,10 +151,10 @@ void Point::SetDisplacementAdjoint(double* newDispAdj){
     DispAdj[2] = newDispAdj[2];
 }
 
-void Point::SetLoadAdjoint(double* newLoadAdj){
-    LoadAdj[0] = newLoadAdj[0];
-    LoadAdj[1] = newLoadAdj[1];
-    LoadAdj[2] = newLoadAdj[2];
+void Point::SetLoadDerivative(double* newLoadDerivative){
+    LoadDerivative[0] = newLoadDerivative[0];
+    LoadDerivative[1] = newLoadDerivative[1];
+    LoadDerivative[2] = newLoadDerivative[2];
 }
 
 void Point::UpdateCoord(){

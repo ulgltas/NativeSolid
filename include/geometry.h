@@ -13,7 +13,7 @@ protected:
   double* Vel_n;
   double* Force;
   double* DispAdj;
-  double* LoadAdj;
+  double* LoadDerivative;
 
 public:
   Point();
@@ -25,7 +25,7 @@ public:
   double* GetVel_n() const;
   double* GetForce() const;
   double* GetDisplacementAdjoint() const;
-  double* GetLoadAdjoint() const;
+  double* GetLoadDerivative() const;
   void PrintCoord() const;
   void SetCoord0(double* newCoord);
   void SetCoord(double* newCoord);
@@ -34,7 +34,7 @@ public:
   void SetVel_n(double* newVel_n);
   void SetForce(double* newForce);
   void SetDisplacementAdjoint(double* newDispAdj);
-  void SetLoadAdjoint(double* newLoadAdj);
+  void SetLoadDerivative(double* newLoadDerivative);
   void UpdateCoord();
   void UpdateVel();
 };

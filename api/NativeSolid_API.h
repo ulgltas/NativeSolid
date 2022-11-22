@@ -83,8 +83,9 @@ public:
     inline double getDeltaOmega() {return integrator->GetSolver()->GetDeltaOmega();};
     inline void setOmega(double val_omega) {integrator->GetSolver()->SetOmega(val_omega);}
     void applyDisplacementAdjoint(unsigned short iVertex, double Dx, double Dy, double Dz);
-    double getLoadAdjointX(unsigned short iVertex);
-    double getLoadAdjointY(unsigned short iVertex);
-    double getLoadAdjointZ(unsigned short iVertex);
+    double getLoadDerivativeX(unsigned short iVertex);
+    double getLoadDerivativeY(unsigned short iVertex);
+    double getLoadDerivativeZ(unsigned short iVertex);
     void setTotalAdjointDisplacement(unsigned int instance);
+    void setFrequencyDerivative(double dJdw);
 };

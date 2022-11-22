@@ -1275,10 +1275,13 @@ void NativeSolidSolver::setGeneralisedMoment(unsigned int instance){
       CenterX = getRotationCenterPosX();
       CenterY = getRotationCenterPosY();
       Moment += (Force[1]*(Coord[0]-CenterX) - Force[0]*(Coord[1]-CenterY));
+      dMoment += Force[1]*(Coord[1]-CenterY);
+      dMoment += Force[0]*(Coord[0]-CenterX); // TODO: Check signs
   }
 
   if(config->GetStructType() == "AIRFOIL"){
     (integrator->GetSolver()->GetLoads())[2*config->GetNumberHarmonics()+1+instance] = -Moment;
+    integrator->GetSolver()->SetLoadGradient(instance, dMoment); // This is added to the Jacobian, so it's positive
   }
   else if(config->GetStructType() == "SPRING_VER"){}
   else if(config->GetStructType() == "SPRING_HOR"){}
@@ -1311,11 +1314,12 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
   double* ExtAdjointDisp;
   double* Coord;
   double dPsi(0.0), sinPsi(0.0), cosPsi(1.0);
-  unsigned int offset = instance*structure->GetnDof();
+  unsigned int offset = instance+2*config->GetNumberHarmonics()+1;
   
   if (config->GetStructType() == "AIRFOIL")
   {
-    dPsi = -(integrator->GetSolver()->GetDisp())[offset+1];
+    dPsi = (integrator->GetSolver()->GetDisp())[offset]; // dPsi = -alpha in the direct part but it gives me a headache
+    cout << "dPsi: " << dPsi << endl;
     sinPsi = sin(dPsi);
     cosPsi = cos(dPsi);
   }
@@ -1327,20 +1331,24 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
   for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
       iPoint = geometry->vertex[iMarker][iVertex];
       ExtAdjointDisp = geometry->node[iPoint]->GetDisplacementAdjoint();
-      AdjDispX += ExtAdjointDisp[0]; // -dx/dx*lambda_x
-      AdjDispY += ExtAdjointDisp[1]; // -dy/dy*lambda_y
+      AdjDispX += ExtAdjointDisp[0]; // dx/dx*dJ/dx
+      AdjDispY += ExtAdjointDisp[1]; // dy/dy*dJ/dy
       Coord = geometry->node[iPoint]->GetCoord();
-      AdjDispZ += ExtAdjointDisp[0]*((Coord[0]-CenterX)*sinPsi - (Coord[1]-CenterY)*cosPsi); // rotation <- z, this is -dx/dPsi*lambda_x
-      AdjDispZ += ExtAdjointDisp[1]*((Coord[1]-CenterY)*sinPsi + (Coord[0]-CenterX)*cosPsi); // rotation <- z, this is -dy/dPsi*lambda_y
+      AdjDispZ += ExtAdjointDisp[0]*(Coord[1]-CenterY); // rotation <- z, this is dx/dPsi*dJ/dx AROUND THE DEFORMED SHAPE. Therefore dPsi is infinitesimally small!
+      AdjDispZ += ExtAdjointDisp[1]*(-1.0*(Coord[0]-CenterX)); // rotation <- z, this is dy/dPsi*dJ/dy
   }
 
   if (config->GetObjFunction() == "ENERGY")
   {
-    AdjDispX += structure->Get_Kh()*integrator->GetSolver()->GetDisp()[offset];
-    AdjDispY += structure->Get_Kh()*integrator->GetSolver()->GetDisp()[offset];
+    AdjDispX += structure->Get_Kh()*integrator->GetSolver()->GetDisp()[instance];
     if (structure->GetnDof() == 2)
     {
-      AdjDispZ -= structure->Get_Ka()*dPsi;
+      AdjDispY -= structure->Get_Kh()*integrator->GetSolver()->GetDisp()[instance];
+      AdjDispZ += structure->Get_Ka()*dPsi;
+    }
+    else
+    {
+      AdjDispY += structure->Get_Kh()*integrator->GetSolver()->GetDisp()[instance];
     }
     
   }
@@ -1353,20 +1361,24 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
   cout << "AdjDispZ: " << AdjDispZ << endl;
 
   if(config->GetStructType() == "AIRFOIL"){
-    (integrator->GetSolver()->GetAdjDisps())[offset]   = AdjDispY;
-    (integrator->GetSolver()->GetAdjDisps())[offset+1] = AdjDispZ;
+    (integrator->GetSolver()->GetAdjDisps())[instance] = -AdjDispY;
+    (integrator->GetSolver()->GetAdjDisps())[offset] = AdjDispZ;
   }
   else if(config->GetStructType() == "SPRING_VER"){
-    (integrator->GetSolver()->GetAdjDisps())[offset] = AdjDispY;
+    (integrator->GetSolver()->GetAdjDisps())[instance] = AdjDispY;
   }
   else if(config->GetStructType() == "SPRING_HOR"){
-    (integrator->GetSolver()->GetAdjDisps())[offset] = AdjDispX;
+    (integrator->GetSolver()->GetAdjDisps())[instance] = AdjDispX;
   }
   else{
     cerr << "Wrong structural type for applying global fluid loads !" << endl;
     throw(-1);
   }
 
+}
+
+void NativeSolidSolver::setFrequencyDerivative(double dJdw){
+  integrator->GetSolver()->SetFrequencyDerivative(dJdw);
 }
 
 void NativeSolidSolver::applyload(unsigned short iVertex, double Fx, double Fy, double Fz){
@@ -1383,14 +1395,6 @@ void NativeSolidSolver::applyload(unsigned short iVertex, double Fx, double Fy, 
     iPoint = geometry->vertex[iMarker][iVertex];
     geometry->node[iPoint]->SetForce(Force);
 
-}
-
-void NativeSolidSolver::applyload(unsigned int iHarmonic, double Fx){
-    integrator->GetSolver()->SetStateLoads(iHarmonic, Fx);
-}
-
-void NativeSolidSolver::applypitch(unsigned int iHarmonic, double alpha){
-    integrator->GetSolver()->SetStates(iHarmonic, 2, alpha);
 }
 
 unsigned int NativeSolidSolver::getNumberHarmonics(){
@@ -1415,48 +1419,48 @@ void NativeSolidSolver::applyDisplacementAdjoint(unsigned short iVertex, double 
   
 }
 
-double NativeSolidSolver::getLoadAdjointX(unsigned short iVertex){
+double NativeSolidSolver::getLoadDerivativeX(unsigned short iVertex){
   if (config->GetKindProblem() == "ADJOINT")
   {
     unsigned short iMarker;
     unsigned long iPoint;
-    double *LoadAdjoint;
+    double *LoadDerivative;
     iMarker = getFSIMarkerID();
     iPoint = geometry->vertex[iMarker][iVertex];
-    LoadAdjoint = geometry->node[iPoint]->GetLoadAdjoint();
-    return LoadAdjoint[0];
+    LoadDerivative = geometry->node[iPoint]->GetLoadDerivative();
+    return LoadDerivative[0];
   }
   else {
     return 0.;
   }
 }
 
-double NativeSolidSolver::getLoadAdjointY(unsigned short iVertex){
+double NativeSolidSolver::getLoadDerivativeY(unsigned short iVertex){
   if (config->GetKindProblem() == "ADJOINT")
   {
     unsigned short iMarker;
     unsigned long iPoint;
-    double *LoadAdjoint;
+    double *LoadDerivative;
     iMarker = getFSIMarkerID();
     iPoint = geometry->vertex[iMarker][iVertex];
-    LoadAdjoint = geometry->node[iPoint]->GetLoadAdjoint();
-    return LoadAdjoint[1];
+    LoadDerivative = geometry->node[iPoint]->GetLoadDerivative();
+    return LoadDerivative[1];
   }
   else {
     return 0.;
   }
 }
 
-double NativeSolidSolver::getLoadAdjointZ(unsigned short iVertex){
+double NativeSolidSolver::getLoadDerivativeZ(unsigned short iVertex){
   if (config->GetKindProblem() == "ADJOINT")
   {
     unsigned short iMarker;
     unsigned long iPoint;
-    double *LoadAdjoint;
+    double *LoadDerivative;
     iMarker = getFSIMarkerID();
     iPoint = geometry->vertex[iMarker][iVertex];
-    LoadAdjoint = geometry->node[iPoint]->GetLoadAdjoint();
-    return LoadAdjoint[2];
+    LoadDerivative = geometry->node[iPoint]->GetLoadDerivative();
+    return LoadDerivative[2];
   }
   else {
     return 0.;
@@ -1465,7 +1469,7 @@ double NativeSolidSolver::getLoadAdjointZ(unsigned short iVertex){
 
 void NativeSolidSolver::computeInterfaceAdjointLoads(){
 
-    double *Coord, Center[3], AdjointLoad[3];
+    double *Coord, Center[3], LoadDer[3];
     unsigned short iMarker, iVertex, nDim(3);
     unsigned long iPoint;
     CVector AdjLoads = integrator->GetSolver()->GetAdjLoads();
@@ -1478,15 +1482,15 @@ void NativeSolidSolver::computeInterfaceAdjointLoads(){
     for(iMarker = 0; iMarker < geometry->GetnMarkers(); iMarker++){
       if (geometry->markersMoving[iMarker] == true){
         for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
-          AdjointLoad[0] = 0.0;
-          AdjointLoad[1] = 0.0;
-          AdjointLoad[2] = 0.0;
+          LoadDer[0] = 0.0;
+          LoadDer[1] = 0.0;
+          LoadDer[2] = 0.0;
           iPoint = geometry->vertex[iMarker][iVertex];
           Coord = geometry->node[iPoint]->GetCoord();
-          AdjointLoad[0] += AdjLoads[0]*(Center[1]-Coord[1]); // Dependence of pitch eq. on X axis forces
-          AdjointLoad[1] += AdjLoads[1]*(Center[0]-Coord[0]); // Dependence of pitch eq. on Y axis forces
-          AdjointLoad[1] -= AdjLoads[0]; // TODO: Check signs // Dependence of plunge eq. on Y axis forces
-          geometry->node[iPoint]->SetLoadAdjoint(AdjointLoad);
+          LoadDer[0] += AdjLoads[1]*(Center[1]-Coord[1]); // Dependence of pitch eq. on X axis forces
+          LoadDer[1] += AdjLoads[1]*(Center[0]-Coord[0]); // Dependence of pitch eq. on Y axis forces
+          LoadDer[1] -= AdjLoads[0]; // Dependence of plunge eq. on Y axis forces
+          geometry->node[iPoint]->SetLoadDerivative(LoadDer);
         }
       }
     }
@@ -1495,9 +1499,9 @@ void NativeSolidSolver::computeInterfaceAdjointLoads(){
 
 void NativeSolidSolver::computeInterfaceAdjointLoads(unsigned int instance){
 
-    double *Coord, Center[3], AdjointLoad[3];
+    double *Coord, Center[3], LoadDer[3];
     unsigned short iMarker, iVertex, nDim(3);
-    unsigned int offset = instance*structure->GetnDof();
+    unsigned int offset = instance+2*config->GetNumberHarmonics()+1; // Location in vector of pitch equation
     unsigned long iPoint;
     CVector AdjLoads = integrator->GetSolver()->GetAdjLoads();
 
@@ -1506,23 +1510,23 @@ void NativeSolidSolver::computeInterfaceAdjointLoads(unsigned int instance){
     Center[0] = structure->GetCenterOfRotation_x();
     Center[1] = structure->GetCenterOfRotation_y();
     Center[2] = structure->GetCenterOfRotation_z();
-    cout << "Offset: " << offset << " AdjLoads[0]: " << AdjLoads[0+offset];
-    if (structure->GetnDof()==2) cout << " AdjLoads[1]: " << AdjLoads[1+offset];
+    cout << "Offset: " << offset << " AdjLoads[0]: " << AdjLoads[instance];
+    if (structure->GetnDof()==2) cout << " AdjLoads[1]: " << AdjLoads[offset];
     cout << endl;
     for(iMarker = 0; iMarker < geometry->GetnMarkers(); iMarker++){
       if (geometry->markersMoving[iMarker] == true){
         for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
-          AdjointLoad[0] = 0.0;
-          AdjointLoad[1] = 0.0;
-          AdjointLoad[2] = 0.0;
+          LoadDer[0] = 0.0;
+          LoadDer[1] = 0.0;
+          LoadDer[2] = 0.0;
           iPoint = geometry->vertex[iMarker][iVertex];
           Coord = geometry->node[iPoint]->GetCoord();
           if (structure->GetnDof()==2){
-            AdjointLoad[0] += AdjLoads[0+offset]*(Center[1]-Coord[1]); // Dependence of pitch eq. on X axis forces
-            AdjointLoad[1] += AdjLoads[1+offset]*(Center[0]-Coord[0]); // Dependence of pitch eq. on Y axis forces
+            LoadDer[0] += AdjLoads[offset]*(Coord[1]-Center[1]); // -Dependence of pitch eq. on X axis forces
+            LoadDer[1] -= AdjLoads[offset]*(Coord[0]-Center[0]); // -Dependence of pitch eq. on Y axis forces
           }
-          AdjointLoad[1] -= AdjLoads[0+offset]; // TODO: Check signs // Dependence of plunge eq. on Y axis forces
-          geometry->node[iPoint]->SetLoadAdjoint(AdjointLoad);
+          LoadDer[1] -= AdjLoads[instance]; // -Dependence of plunge eq. on Y axis forces
+          geometry->node[iPoint]->SetLoadDerivative(LoadDer);
         }
       }
     }

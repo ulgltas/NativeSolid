@@ -55,7 +55,8 @@ NativeSolidSolver::NativeSolidSolver(string str, bool FSIComp):confFile(str){
     historyFile.open("NativeHistory.dat", ios::out);
     historyFile2.open("NativeHistoryFSI.dat", ios::out);
   }
-  
+  historyFile.precision(8); // More digits than default for history files
+  historyFile2.precision(8);
   
 
   while(iMarker < geometry->GetnMarkers()){
@@ -477,7 +478,7 @@ void NativeSolidSolver::computeInterfacePosVel(bool initialize){
           geometry->node[iPoint]->SetVel(newVel);
 
           /*--- At initialisation, propagate the initial position of the inteface in the past ---*/
-          if(initialize){
+          if(initialize && config->GetUnsteady() != "HARMONIC"){
               geometry->node[iPoint]->SetCoord_n(newCoord);
               geometry->node[iPoint]->SetVel_n(newVel);
           }
@@ -831,9 +832,15 @@ void NativeSolidSolver::writeSolution(double time, int FSIter){
       }
       else if(config->GetUnsteady() == "HARMONIC"){
         double currentTime = 0.;
+        double Energy(0);
         unsigned short nInst = 2*getNumberHarmonics()+1;
         for (unsigned short iInst = 0; iInst < nInst ; iInst++)
         {
+          double h, alpha;
+          h = (integrator->GetSolver()->GetDisp())[iInst];
+          alpha = (integrator->GetSolver()->GetDisp())[iInst+nInst];
+          Energy += .5*(structure->Get_Kh())*h*h;
+          Energy += .5*(structure->Get_Ka())*alpha*alpha;
           historyFile2 << fixed
                        << setw(10) << currentTime
                        << setw(10) << FSIter
@@ -843,9 +850,9 @@ void NativeSolidSolver::writeSolution(double time, int FSIter){
                        << setw(15) << (integrator->GetSolver()->GetVel())[iInst+nInst]
                        << setw(15) << (integrator->GetSolver()->GetAcc())[iInst]
                        << setw(15) << (integrator->GetSolver()->GetAcc())[iInst+nInst]
-                       << setw(15) << (integrator->GetSolver()->GetL2Norm())
-                       << setw(15) << (integrator->GetSolver()->GetdL2dwNorm())
-                       << setw(15) << (integrator->GetSolver()->GetOmega()) << endl;
+                       << setw(15) << Energy
+                       << setw(15) << (integrator->GetSolver()->GetOmega()) 
+                       << setw(15) << (integrator->GetSolver()->GetDeltaOmega()) << endl;
           currentTime += config->GetStopTime()/nInst;
         }
       }
@@ -931,22 +938,38 @@ void NativeSolidSolver::writeAdjointSolution(double time, int FSIter){
                      << setw(15) << (integrator->GetSolver()->GetAcc())[1] << endl;
       }
       else if(config->GetUnsteady() == "HARMONIC"){
+        double Energy(0), dJdkh(0), dJdka(0);
+        double h, alpha;
         double currentTime = 0.;
         unsigned short nInst = 2*getNumberHarmonics()+1;
         for (unsigned short iInst = 0; iInst < nInst ; iInst++)
         {
+          h = (integrator->GetSolver()->GetDisp())[iInst];
+          alpha = (integrator->GetSolver()->GetDisp())[iInst+nInst];
+          Energy += .5*(structure->Get_Kh())*h*h;
+          Energy += .5*(structure->Get_Ka())*alpha*alpha;
+          if (config->GetObjFunction() == "ENERGY")
+          {
+            dJdkh += .5*h*h;
+            dJdka += .5*alpha*alpha;
+          }
           historyFile2 << fixed
                        << setw(10) << currentTime
                        << setw(10) << FSIter
-                       << setw(15) << (integrator->GetSolver()->GetDisp())[iInst]
-                       << setw(15) << (integrator->GetSolver()->GetDisp())[iInst+nInst]
-                       << setw(15) << (integrator->GetSolver()->GetVel())[iInst]
-                       << setw(15) << (integrator->GetSolver()->GetVel())[iInst+nInst]
-                       << setw(15) << (integrator->GetSolver()->GetAcc())[iInst]
-                       << setw(15) << (integrator->GetSolver()->GetAcc())[iInst+nInst]
-                       << setw(15) << (integrator->GetSolver()->GetL2Norm())
-                       << setw(15) << (integrator->GetSolver()->GetdL2dwNorm())
-                       << setw(15) << (integrator->GetSolver()->GetOmega()) << endl;
+                       << setw(15) << Energy
+                       << setw(15) << integrator->GetSolver()->GetStiffnessDerivative(0)+dJdkh
+                       << setw(15) << integrator->GetSolver()->GetStiffnessDerivative(1)+dJdka
+                       << setw(15) << integrator->GetSolver()->GetDampingDerivative(0)
+                       << setw(15) << integrator->GetSolver()->GetDampingDerivative(1)
+                       << setw(15) << integrator->GetSolver()->GetMassDerivative(0)+integrator->GetSolver()->GetImbalanceDerivative()*structure->Get_S()/structure->Get_m()
+                       << setw(15) << integrator->GetSolver()->GetMassDerivative(1)
+                       << setw(15) << integrator->GetSolver()->GetImbalanceDerivative()/structure->Get_m() << endl;
+          historyFile << scientific
+                       << setw(10) << currentTime
+                       << setw(10) << FSIter
+                       << setw(20) << Energy
+                       << setw(20) << integrator->GetSolver()->GetAdjLoads()[iInst]
+                       << setw(20) << integrator->GetSolver()->GetAdjLoads()[iInst+nInst]<< endl;
           currentTime += config->GetStopTime()/nInst;
         }
       }
@@ -1263,6 +1286,7 @@ void NativeSolidSolver::setGeneralisedMoment(unsigned int instance){
   unsigned short iVertex, iMarker;
   unsigned long iPoint;
   double Moment(0.0), CenterX, CenterY, CenterZ;
+  double dMoment(0.0); // Derivative of moment with respect to pitch
   double* Force;
   double* Coord;
 

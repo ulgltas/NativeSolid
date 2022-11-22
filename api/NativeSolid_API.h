@@ -74,16 +74,13 @@ public:
     double getRotationCenterPosX();
     double getRotationCenterPosY();
     double getRotationCenterPosZ();
-    void setGeneralisedForce();
+    void setGeneralisedForce(unsigned int instance = 0);
     void setGeneralisedForce(double Fx, double Fy);
-    void setGeneralisedMoment();
+    void setGeneralisedMoment(unsigned int instance = 0);
     void setGeneralisedMoment(double M);
     void applyload(unsigned short iVertex, double Fx, double Fy, double Fz);
-    void applyload(unsigned int iHarmonic, double Fx);
-    void applypitch(unsigned int iHarmonic, double alpha);
     unsigned int getNumberHarmonics();
-    inline double GetL2Norm() {return integrator->GetSolver()->GetL2Norm();}
-    inline double GetdL2dwNorm() {return integrator->GetSolver()->GetdL2dwNorm();}
+    inline double getDeltaOmega() {return integrator->GetSolver()->GetDeltaOmega();};
     inline void setOmega(double val_omega) {integrator->GetSolver()->SetOmega(val_omega);}
     void applyDisplacementAdjoint(unsigned short iVertex, double Dx, double Dy, double Dz);
     double getLoadAdjointX(unsigned short iVertex);

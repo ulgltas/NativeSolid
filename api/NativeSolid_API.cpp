@@ -1208,7 +1208,7 @@ double NativeSolidSolver::getRotationCenterPosZ(){
     return structure->GetCenterOfRotation_z();
 }
 
-void NativeSolidSolver::setGeneralisedForce(){
+void NativeSolidSolver::setGeneralisedForce(unsigned int instance){
 
   unsigned short iVertex, iMarker;
   unsigned long iPoint;
@@ -1226,13 +1226,13 @@ void NativeSolidSolver::setGeneralisedForce(){
   }
 
   if(config->GetStructType() == "SPRING_HOR"){
-    (integrator->GetSolver()->GetLoads())[0] = ForceX;
+    (integrator->GetSolver()->GetLoads())[instance] = ForceX;
   }
   else if(config->GetStructType() == "SPRING_VER"){
-    (integrator->GetSolver()->GetLoads())[0] = ForceY;
+    (integrator->GetSolver()->GetLoads())[instance] = ForceY;
   }
   else if(config->GetStructType() == "AIRFOIL"){
-    (integrator->GetSolver()->GetLoads())[0] = -ForceY;
+    (integrator->GetSolver()->GetLoads())[instance] = -ForceY;
   }
   else{
     cerr << "Wrong structural type for applying global fluid loads !" << endl;
@@ -1258,7 +1258,7 @@ void NativeSolidSolver::setGeneralisedForce(double Fx, double Fy){
   }
 }
 
-void NativeSolidSolver::setGeneralisedMoment(){
+void NativeSolidSolver::setGeneralisedMoment(unsigned int instance){
 
   unsigned short iVertex, iMarker;
   unsigned long iPoint;
@@ -1278,7 +1278,7 @@ void NativeSolidSolver::setGeneralisedMoment(){
   }
 
   if(config->GetStructType() == "AIRFOIL"){
-    (integrator->GetSolver()->GetLoads())[1] = -Moment;
+    (integrator->GetSolver()->GetLoads())[2*config->GetNumberHarmonics()+1+instance] = -Moment;
   }
   else if(config->GetStructType() == "SPRING_VER"){}
   else if(config->GetStructType() == "SPRING_HOR"){}

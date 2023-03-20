@@ -1233,15 +1233,16 @@ double NativeSolidSolver::getRotationCenterPosZ(){
 void NativeSolidSolver::setGeneralisedForce(unsigned int instance){
 
   unsigned short iVertex, iMarker;
-  unsigned long iPoint;
+  unsigned long iPoint, nPoint;
   double ForceX(0.0), ForceY(0.0), ForceZ(0.0);
   double* force;
 
   iMarker = getFSIMarkerID();
+  nPoint = geometry->GetnPoint();
 
   for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
       iPoint = geometry->vertex[iMarker][iVertex];
-      force = geometry->node[iPoint]->GetForce();
+      force = geometry->node[iPoint+nPoint*instance]->GetForce();
       ForceX += force[0];
       ForceY += force[1];
       ForceZ += force[2];
@@ -1283,17 +1284,18 @@ void NativeSolidSolver::setGeneralisedForce(double Fx, double Fy){
 void NativeSolidSolver::setGeneralisedMoment(unsigned int instance){
 
   unsigned short iVertex, iMarker;
-  unsigned long iPoint;
+  unsigned long iPoint, nPoint;
   double Moment(0.0), CenterX, CenterY, CenterZ;
   double dMoment(0.0); // Derivative of moment with respect to pitch
   double* Force;
   double* Coord;
 
   iMarker = getFSIMarkerID();
+  nPoint = geometry->GetnPoint();
 
   for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
       iPoint = geometry->vertex[iMarker][iVertex];
-      Force = geometry->node[iPoint]->GetForce();
+      Force = geometry->node[iPoint+nPoint*instance]->GetForce();
       Coord = geometry->node[iPoint]->GetCoord();
       CenterX = getRotationCenterPosX();
       CenterY = getRotationCenterPosY();
@@ -1338,6 +1340,7 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
   double* Coord;
   double dPsi(0.0), sinPsi(0.0), cosPsi(1.0);
   unsigned int offset = instance+2*config->GetNumberHarmonics()+1;
+  unsigned long nPoint = geometry->GetnPoint();
   
   if (config->GetStructType() == "AIRFOIL")
   {
@@ -1353,7 +1356,7 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
   CenterY = getRotationCenterPosY();
   for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
       iPoint = geometry->vertex[iMarker][iVertex];
-      ExtAdjointDisp = geometry->node[iPoint]->GetDisplacementAdjoint();
+      ExtAdjointDisp = geometry->node[iPoint+nPoint*instance]->GetDisplacementAdjoint();
       AdjDispX += ExtAdjointDisp[0]; // dx/dx*dJ/dx
       AdjDispY += ExtAdjointDisp[1]; // dy/dy*dJ/dy
       Coord = geometry->node[iPoint]->GetCoord();

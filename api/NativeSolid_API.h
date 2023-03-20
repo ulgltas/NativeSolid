@@ -25,6 +25,7 @@ protected:
     std::ofstream historyFile2;
     std::ofstream restartFile;
     CVector q_uM1; //The displacement at the previous FSI iteration
+    CVector posDV, magDV; // Design variable position and magnitude
     double omega;
     unsigned long nSolidInterfaceVertex;
     double varCoordNorm;
@@ -88,5 +89,10 @@ public:
     double getLoadDerivativeZ(unsigned short iVertex);
     void setTotalAdjointDisplacement(unsigned int instance);
     void setFrequencyDerivative(double dJdw);
+    void setDesignVariableCentre(double x, unsigned long iDV);
+    void setDesignVariableMagnitude(double mag, unsigned long iDV);
+    void applyDesignVariables();
+    inline unsigned long getNumberDesignVariables() {return config->GetNumberDesignVariables();};
+    double getDesignVariableDerivative(unsigned long iDV);
     double getObjectiveFunction();
 };

@@ -77,6 +77,8 @@ void Config::ReadConfig()
     else if (option == "OMEGA") OMEGA = atof(text_line.c_str());
     else if (option == "NUMBER_HARMONICS") NUMBER_HARMONICS = atol(text_line.c_str());
 	else if (option == "RHO") RHO = atof(text_line.c_str());
+    else if (option == "DESIGN_VARIABLE_KIND") DESIGN_VARIABLE_KIND = text_line;
+    else if (option == "NUMBER_DESIGN_VARIABLES") NUMBER_DESIGN_VARIABLES = atol(text_line.c_str());
         else cout << "The option " + option + " is not recognized !" << endl;
 	}
     }
@@ -148,7 +150,13 @@ std::string Config::GetMovingMarker()
     return MOVING_MARKER;
 }
 
-double Config::GetStartTime(){
+std::string Config::GetDesignVariableKind()
+{
+    return DESIGN_VARIABLE_KIND;
+}
+
+double Config::GetStartTime()
+{
     return START_TIME;
 }
 
@@ -222,4 +230,9 @@ unsigned long Config::GetNumberHarmonics(){
 
 double Config::GetRho(){
     return RHO;
+}
+
+unsigned long Config::GetNumberDesignVariables()
+{
+    return NUMBER_DESIGN_VARIABLES;
 }

@@ -81,6 +81,11 @@ NativeSolidSolver::NativeSolidSolver(string str, bool FSIComp):confFile(str){
   q_uM1.Initialize(structure->GetnDof());
   q_uM1.Reset();
 
+  posDV.Initialize(config->GetNumberDesignVariables());
+  posDV.Reset();
+  magDV.Initialize(config->GetNumberDesignVariables());
+  magDV.Reset();
+
   if(rank == MASTER_NODE){
     if(structure->GetnDof() == 1){
       if((config->GetUnsteady() == "YES" || config->GetUnsteady() == "HARMONIC") && config->GetKindProblem() != "ADJOINT"){
@@ -1405,6 +1410,105 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
 
 void NativeSolidSolver::setFrequencyDerivative(double dJdw){
   integrator->GetSolver()->SetFrequencyDerivative(dJdw);
+}
+
+void NativeSolidSolver::setDesignVariableCentre(double x, unsigned long iDV)
+{
+  if (iDV < config->GetNumberDesignVariables())
+  {
+    posDV[iDV] = x;
+  }
+}
+
+void NativeSolidSolver::setDesignVariableMagnitude(double mag, unsigned long iDV)
+{
+  if (iDV < config->GetNumberDesignVariables())
+  {
+    magDV[iDV] = mag;
+  }
+}
+
+void NativeSolidSolver::applyDesignVariables()
+{
+  unsigned short iMarker, iVertex;
+  unsigned long iPoint;
+  double newCoord[3];
+  double* Coord0;
+
+  iMarker = getFSIMarkerID();
+  if (config->GetDesignVariableKind() == "HICKS_HENNE_SYMMETRIC"){
+    for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
+      iPoint = geometry->vertex[iMarker][iVertex];
+      Coord0 = geometry->node[iPoint]->GetCoord0();
+      
+      if (Coord0[0] > 1.0e-5) // To avoid problems in LE
+      {
+        double upper = copysign(1.0, Coord0[1]); // Differentiate between suction and pressure side. Will fail for some aerofoils...
+        double xk = Coord0[0]/config->GetCord();
+        newCoord[0] = Coord0[0];
+        newCoord[1] = Coord0[1];
+        newCoord[2] = Coord0[2];
+        for (unsigned long iDV = 0; iDV < config->GetNumberDesignVariables(); iDV++){
+          double ek = log10(0.5)/log10(posDV[iDV]);
+          newCoord[0] = newCoord[0];
+          newCoord[1] = newCoord[1]+upper*magDV[iDV]*pow(sin( M_PI * pow(xk, ek)), 3.0);
+          newCoord[2] = newCoord[2];
+        }
+        geometry->node[iPoint]->SetCoord_n(newCoord); // Hacky. I am using Coord_n as the new base coordinate, with the DVs applied
+      }
+    }
+  }
+  
+}
+
+double NativeSolidSolver::getDesignVariableDerivative(unsigned long iDV)
+{
+  unsigned short iMarker, iVertex;
+  unsigned long iPoint, nPoint;
+  unsigned long nInst = 2*config->GetNumberHarmonics()+1;
+  double dJdDV = 0.;
+  double dX, dY, dZ, dPsi;
+  double* Coord0;
+  double* ExtAdjointDisp;
+  double* Force;
+  CVector AdjLoads = integrator->GetSolver()->GetAdjLoads();
+
+  iMarker = getFSIMarkerID();
+  nPoint = geometry->GetnPoint();
+  if (iDV < config->GetNumberDesignVariables() && config->GetDesignVariableKind() == "HICKS_HENNE_SYMMETRIC")
+  {
+    double ek = log10(0.5)/log10(posDV[iDV]);
+    for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
+      dX = 0.;
+      dY = 0.;
+      dZ = 0.;
+      iPoint = geometry->vertex[iMarker][iVertex];
+      Coord0 = geometry->node[iPoint]->GetCoord0(); // We are deforming the original shape
+      if (Coord0[0] > 1.0e-5) // To avoid problems in LE
+      {
+        double upper = copysign(1.0, Coord0[1]); // Differentiate between suction and pressure side. Will fail for some aerofoils...
+        double xk = Coord0[0]/config->GetCord();
+        dX = 0.;
+        dY = upper*pow(sin( M_PI * pow(xk, ek)), 3.0);
+        for (unsigned long iInst = 0; iInst < nInst; iInst++)
+        {
+          dPsi = (integrator->GetSolver()->GetDisp())[iInst+nInst];
+          ExtAdjointDisp = geometry->node[iPoint+nPoint*iInst]->GetDisplacementAdjoint();
+          Force = geometry->node[iPoint+nPoint*iInst]->GetForce();
+          dJdDV += ExtAdjointDisp[0]*sin(dPsi)*dY; // SU2 dJ/dx*dx/dBump
+          dJdDV += ExtAdjointDisp[1]*cos(dPsi)*dY; // SU2 dJ/dy*dy/dBump
+          dJdDV -= AdjLoads[nInst+iInst]*Force[1]*sin(dPsi)*dY;
+          dJdDV += AdjLoads[nInst+iInst]*Force[0]*cos(dPsi)*dY;
+          /*Moment += (Force[1]*(Coord[0]-CenterX) - Force[0]*(Coord[1]-CenterY));
+          dMoment += Force[1]*(Coord[1]-CenterY);
+          dMoment += Force[0]*(Coord[0]-CenterX); // TODO: Check signs*/
+        }
+        
+      }
+    }
+
+  }
+  return dJdDV;
 }
 
 double NativeSolidSolver::getObjectiveFunction()

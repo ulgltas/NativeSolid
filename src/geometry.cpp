@@ -81,7 +81,12 @@ double* Point::GetCoord() const{
   return Coord;
 }
 
-double* Point::GetCoord_n() const{
+double *Point::GetVarCoord() const
+{
+  return VarCoord;
+}
+double *Point::GetCoord_n() const
+{
   return Coord_n;
 }
 
@@ -113,6 +118,12 @@ void Point::SetCoord0(double* newCoord){
   Coord0[0] = newCoord[0];
   Coord0[1] = newCoord[1];
   Coord0[2] = newCoord[2];
+}
+
+void Point::SetVarCoord(double* newCoord){
+  VarCoord[0] = newCoord[0];
+  VarCoord[1] = newCoord[1];
+  VarCoord[2] = newCoord[2];
 }
 
 void Point::SetCoord(double* newCoord){
@@ -179,6 +190,7 @@ Geometry::Geometry(Config* config){
   unsigned long iMarker(0);
   int elemType(0), dummyInt(0);
   int iPoint;
+  int nInst = 2*config->GetNumberHarmonics()+1;
 
   Coord[0] = 0.0;
   Coord[1] = 0.0;
@@ -225,21 +237,27 @@ Geometry::Geometry(Config* config){
       textLine.erase(0,6);
       nPoint = atoi(textLine.c_str());
       cout << "Number of points : " << nPoint << endl;
-      node = new Point*[nPoint];
+      node = new Point*[nPoint*nInst];
       //cout << "JE VAIS REMPLIR" << endl;
       for(iPoint=0; iPoint < nPoint; iPoint++){
         getline(meshFile, textLine);
         //if(iPoint == 1) cout << textLine << endl;
-        node[iPoint] = new Point();
+        for (int iInst = 0; iInst < nInst; iInst++)
+        {
+          node[iPoint+iInst*nPoint] = new Point();
+        }
         istringstream point_line(textLine);
         point_line >> Coord[0];
         //if(iPoint == 1) cout << Coord[0] << endl;
         point_line >> Coord[1];
         //if(iPoint == 1) cout << Coord[1] << endl;
         if(nDim == 3) point_line >> Coord[2];
-        node[iPoint]->SetCoord0(Coord);
-        node[iPoint]->SetCoord(Coord);
-        node[iPoint]->SetCoord_n(Coord);
+        for (int iInst = 0; iInst < nInst; iInst++)
+        {
+          node[iPoint+iInst*nPoint]->SetCoord0(Coord);
+          node[iPoint+iInst*nPoint]->SetCoord(Coord);
+          node[iPoint+iInst*nPoint]->SetCoord_n(Coord);
+        }
         TempCoord = node[iPoint]->GetCoord();
       //cout << iPoint << endl;
       }

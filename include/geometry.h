@@ -89,6 +89,7 @@ public:
   ~Geometry();
   unsigned long GetnMarkers() const;
   bool GetMarkersMoving(unsigned long iMarker) const;
+  unsigned long GetnPoint();
   void UpdateGeometry();
   unsigned long** vertex;  //vertex[iMarker][iPoint]
   unsigned long* nVertex;  //nVertex[iMarker]

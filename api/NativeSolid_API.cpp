@@ -1415,9 +1415,13 @@ double NativeSolidSolver::getObjectiveFunction()
   return J;
 }
 
+void NativeSolidSolver::applyload(unsigned short iVertex, unsigned int iInst, double Fx, double Fy, double Fz){
+
     unsigned short iMarker;
-    unsigned long iPoint;
+    unsigned long iPoint, nPoint;
     double Force[3];
+
+    nPoint = geometry->GetnPoint();
 
     Force[0] = Fx;
     Force[1] = Fy;
@@ -1425,7 +1429,7 @@ double NativeSolidSolver::getObjectiveFunction()
 
     iMarker = getFSIMarkerID();
     iPoint = geometry->vertex[iMarker][iVertex];
-    geometry->node[iPoint]->SetForce(Force);
+    geometry->node[iPoint+nPoint*iInst]->SetForce(Force);
 
 }
 
@@ -1433,11 +1437,11 @@ unsigned int NativeSolidSolver::getNumberHarmonics(){
     return config->GetNumberHarmonics();
 }
 
-void NativeSolidSolver::applyDisplacementAdjoint(unsigned short iVertex, double Dx, double Dy, double Dz){
+void NativeSolidSolver::applyDisplacementAdjoint(unsigned short iVertex, unsigned int iInst, double Dx, double Dy, double Dz){
   if (config->GetKindProblem() == "ADJOINT")
   {
     unsigned short iMarker;
-    unsigned long iPoint;
+    unsigned long iPoint, nPoint;
     double DispAdj[3];
 
     DispAdj[0] = Dx;
@@ -1446,7 +1450,8 @@ void NativeSolidSolver::applyDisplacementAdjoint(unsigned short iVertex, double 
 
     iMarker = getFSIMarkerID();
     iPoint = geometry->vertex[iMarker][iVertex];
-    geometry->node[iPoint]->SetDisplacementAdjoint(DispAdj);
+    nPoint = geometry->GetnPoint();
+    geometry->node[iPoint+iInst*nPoint]->SetDisplacementAdjoint(DispAdj);
   }
   
 }

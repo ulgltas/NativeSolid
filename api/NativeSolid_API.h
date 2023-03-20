@@ -78,11 +78,11 @@ public:
     void setGeneralisedForce(double Fx, double Fy);
     void setGeneralisedMoment(unsigned int instance = 0);
     void setGeneralisedMoment(double M);
-    void applyload(unsigned short iVertex, double Fx, double Fy, double Fz);
+    void applyload(unsigned short iVertex, unsigned int iInst, double Fx, double Fy, double Fz);
     unsigned int getNumberHarmonics();
     inline double getDeltaOmega() {return integrator->GetSolver()->GetDeltaOmega();};
     inline void setOmega(double val_omega) {integrator->GetSolver()->SetOmega(val_omega);}
-    void applyDisplacementAdjoint(unsigned short iVertex, double Dx, double Dy, double Dz);
+    void applyDisplacementAdjoint(unsigned short iVertex, unsigned int instance, double Dx, double Dy, double Dz);
     double getLoadDerivativeX(unsigned short iVertex);
     double getLoadDerivativeY(unsigned short iVertex);
     double getLoadDerivativeZ(unsigned short iVertex);

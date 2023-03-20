@@ -342,6 +342,11 @@ bool Geometry::GetMarkersMoving(unsigned long iMarker) const{
   return markersMoving[iMarker];
 }
 
+unsigned long Geometry::GetnPoint()
+{
+  return nPoint;
+}
+
 void Geometry::UpdateGeometry(){
 
   unsigned long iPoint;

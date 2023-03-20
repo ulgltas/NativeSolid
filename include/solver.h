@@ -44,6 +44,7 @@ public:
     virtual void SetLoadGradient(unsigned int dof, double val_dfdq) {};
     virtual double GetOmega() {return 0.;};
     virtual double GetDeltaOmega() {return 0.;};
+    virtual double GetAmplitude() {return 0.;};
     virtual double GetStiffnessDerivative(unsigned int dof) {return 0.;}
     virtual double GetDampingDerivative(unsigned int dof) {return 0.;}
     virtual double GetMassDerivative(unsigned int dof) {return 0.;}
@@ -118,12 +119,14 @@ protected:
     double omega;
     double omega_n; // Old base frequency
     double deltaOmega;
+    double amplitude;
     CMatrix d; // Harmonic balance time derivative
     CMatrix d2; // Harmonic balance second time derivative
     CMatrix AA; // Harmonic balance physics matrix
     CMatrix E; // Harmonic balance DFT matrix
     CMatrix Em1; // Harmonic balance IFT matrix
 
+    bool pitchObjFun; // Pitching amplitude objective function
 public:
     HarmonicSolver(unsigned nDof, unsigned int nHarmonic, bool bool_linear);
     ~HarmonicSolver();
@@ -135,6 +138,7 @@ public:
     virtual void SetOmega(double val_omega) {omega = val_omega; SetHBMatrices();};
     virtual double GetOmega() {return omega;};
     virtual double GetDeltaOmega() {return deltaOmega;};
+    virtual double GetAmplitude() {return amplitude;};
 };
 
 class AdjointStaticSolver : public StaticSolver {

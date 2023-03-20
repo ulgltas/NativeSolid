@@ -1404,7 +1404,16 @@ void NativeSolidSolver::setFrequencyDerivative(double dJdw){
   integrator->GetSolver()->SetFrequencyDerivative(dJdw);
 }
 
-void NativeSolidSolver::applyload(unsigned short iVertex, double Fx, double Fy, double Fz){
+double NativeSolidSolver::getObjectiveFunction()
+{
+  double J = 0.0;
+  if (config->GetObjFunction() == "PITCH_AMPLITUDE")
+  {
+    J += integrator->GetSolver()->GetAmplitude();
+  }
+  
+  return J;
+}
 
     unsigned short iMarker;
     unsigned long iPoint;

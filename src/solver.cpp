@@ -716,6 +716,7 @@ HarmonicSolver::HarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_line
   d2.Initialize(_nOmega, _nOmega, 0.0);
   AA.Initialize(_nOmega, _nOmega, 0.0);
   deltaOmega = 0.;
+  amplitude = 0.;
 }
 
 HarmonicSolver::~HarmonicSolver() {}
@@ -780,6 +781,7 @@ void HarmonicSolver::SetInitialState(Config *config, Structure *structure){
   nHarmonics = config->GetNumberHarmonics();
   cout << "Damping: " << damping << " Omega^2: " << omegaN2 << " nH: " << nHarmonics << endl;
   SetHBMatrices();
+  pitchObjFun = (config->GetObjFunction() == "PITCH_AMPLITUDE");
 }
 
 void HarmonicSolver::SetHBMatrices(){
@@ -921,7 +923,6 @@ void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
   {
     for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
     {
-      cout << counter << endl;
       if (jOmega+iDof*_nOmega != fDoF)
       {
         temp_hold[jOmega] = x_temp[jOmega+iDof*_nOmega]+Res[counter];
@@ -931,6 +932,10 @@ void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
       {
         temp_hold[jOmega] = 0.;
       }
+    }
+    if (iDof == 1)
+    {
+      amplitude = temp_hold[1]*temp_hold[1];
     }
     q_temp = MatVecProd(Em1, temp_hold);
     for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
@@ -1095,6 +1100,11 @@ void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure
       f_temp[jOmega] = qDerivative[jOmega+dofStart];
     }
     temp_hold = MatVecProd(E, q_temp);
+    if (iDof == 1)
+    {
+      amplitude = temp_hold[1]*temp_hold[1];
+    }
+    
     for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
     {
       x_temp[jOmega+dofStart] = temp_hold[jOmega];
@@ -1155,6 +1165,11 @@ void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure
     Res[counter] = RHS[i+_nTotal];
     counter++;
   }
+  if (pitchObjFun && _nDof == 2) // PITCH_AMPLITUDE only makes sense for airfoils that can pitch
+  {
+    Res[_nOmega+1] += 2*x_temp[_nOmega+1]; // This isn't how it should be done BUT x_temp is [plunge;pitch;plungedot;pitchdot]
+  }
+
   Res[2*_nTotal-1] = AdjointOmega;
 
   SolveSys(dRes, Res);

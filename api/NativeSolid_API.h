@@ -88,4 +88,5 @@ public:
     double getLoadDerivativeZ(unsigned short iVertex);
     void setTotalAdjointDisplacement(unsigned int instance);
     void setFrequencyDerivative(double dJdw);
+    double getObjectiveFunction();
 };

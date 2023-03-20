@@ -776,8 +776,7 @@ void NativeSolidSolver::saveSolution(){
         }
       }
     }
-
-    
+  output->WriteRestart(integrator, structure, config);
 }
 
 void NativeSolidSolver::writeSolution(double time, int FSIter){

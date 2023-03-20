@@ -26,23 +26,44 @@ void Output::WriteHistory(Integration* solver, Structure* structure, ofstream* o
     cout << time << "\t" << (*(solver->GetDisp()))[0] << "\t" << (*(solver->GetDisp()))[1] << "\t" << (*(solver->GetVel()))[0] << "\t" << (*(solver->GetVel()))[1] << "\t" << (*(solver->GetAcc()))[0] << "\t" << (*(solver->GetAcc()))[1] << endl;
     outputfile[0] << time << "\t" << (*(solver->GetDisp()))[0] << "\t" << (*(solver->GetDisp()))[1] << "\t" << (*(solver->GetVel()))[0] << "\t" << (*(solver->GetVel()))[1] << "\t" << (*(solver->GetAcc()))[0] << "\t" << (*(solver->GetAcc()))[1] << endl;
   }
-}
+}*/
 
-void Output::WriteRestart(Integration* solver, Structure* structure){
+void Output::WriteRestart(Integration* integrator, Structure* structure, Config* config){
   ofstream RestartFile;
-  RestartFile.open("Nat_solution_restart.out", ios::out);
+  double time(0.0);
+  unsigned short nInst = 2*config->GetNumberHarmonics()+1;
+  RestartFile.open("restart_solid.dat", ios::out);
+  RestartFile.precision(8);
 
   if(structure->GetnDof() == 1){
-    RestartFile << "\"Displacement\"" << "\t" << "\"Velocity\"" << "\t" << "\"Acceleration\"" << "\t" << "\"Acceleration variable\"" << endl;
-    RestartFile << (*(solver->GetDisp()))[0] << "\t" << (*(solver->GetVel()))[0] << "\t" << (*(solver->GetAcc()))[0] << "\t" << (*(solver->GetAccVar()))[0] << endl;
+    RestartFile << "Displacement" << "\t" << "Velocity" << "\t" << "Acceleration" << endl;
+    for (unsigned short iInst = 0; iInst < nInst; iInst++)
+    {
+      RestartFile << fixed
+                  << (integrator->GetSolver()->GetDisp())[iInst] << "\t"
+                  << (integrator->GetSolver()->GetVel())[iInst] << "\t"
+                  << (integrator->GetSolver()->GetAcc())[iInst] << endl;
+    }
   }
   else if(structure->GetnDof() == 2){
-    RestartFile << "\"Displacement 1\"" << "\t" << "\"Displacement 2\"" << "\t" << "\"Velocity 1\""  << "\t" << "\"Velocity 2\"" << "\t" << "\"Acceleration 1\"" << "\t" << "\"Acceleration 2\"" << "\t" << "\"Acceleration variable 1\"" << "\t" << "\"Acceleration variable 2\"" << endl;
-    RestartFile << time << "\t" << (*(solver->GetDisp()))[0] << "\t" << (*(solver->GetDisp()))[1] << "\t" << (*(solver->GetVel()))[0] << "\t" << (*(solver->GetVel()))[1] << "\t" << (*(solver->GetAcc()))[0] << "\t" << (*(solver->GetAcc()))[1]<< "\t" << (*(solver->GetAccVar()))[0] << "\t" << (*(solver->GetAccVar()))[1] << endl;
+    RestartFile << "Time" << "\t" << "Displacement_1" << "\t" << "Displacement_2" << "\t" << "Velocity_1"  << "\t" << "Velocity_2" << "\t" << "Acceleration_1" << "\t" << "Acceleration_2" << endl;
+    for (unsigned short iInst = 0; iInst < nInst; iInst++)
+    {
+      RestartFile << fixed
+                  << time << "\t"
+                  << (integrator->GetSolver()->GetDisp())[iInst] << "\t"
+                  << (integrator->GetSolver()->GetDisp())[iInst+nInst] << "\t"
+                  << (integrator->GetSolver()->GetVel())[iInst] << "\t"
+                  << (integrator->GetSolver()->GetVel())[iInst+nInst] << "\t"
+                  << (integrator->GetSolver()->GetAcc())[iInst] << "\t"
+                  << (integrator->GetSolver()->GetAcc())[iInst+nInst] << endl;
+      time += 0.1;
+    }
   }
+  RestartFile.close();
 }
 
-void Output::WriteStaticSolution(Config* config, Integration* solver, Structure* structure, ofstream* outputfile){
+/*void Output::WriteStaticSolution(Config* config, Integration* solver, Structure* structure, ofstream* outputfile){
   if(structure->GetnDof() == 1){
     cout << "Static displacement is : " << (*(solver->GetDisp()))[0] << " [m]" << endl;
     cout << "Writing displacement into a solution file" << endl;

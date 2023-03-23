@@ -25,7 +25,8 @@ protected:
     std::ofstream historyFile2;
     std::ofstream restartFile;
     CVector q_uM1; //The displacement at the previous FSI iteration
-    CVector posDV, magDV; // Design variable position and magnitude
+    CVector posDV, magDV; // Design variable x-position and magnitude
+    CVector sideDV; // Design variable location (intrados: -1, extrados: 1)
     double omega;
     unsigned long nSolidInterfaceVertex;
     double varCoordNorm;
@@ -91,6 +92,7 @@ public:
     void setFrequencyDerivative(double dJdw);
     void setDesignVariableCentre(double x, unsigned long iDV);
     void setDesignVariableMagnitude(double mag, unsigned long iDV);
+    void setDesignVariableSide(double side, unsigned long iDV);
     void applyDesignVariables();
     inline unsigned long getNumberDesignVariables() {return config->GetNumberDesignVariables();};
     double getDesignVariableDerivative(unsigned long iDV);

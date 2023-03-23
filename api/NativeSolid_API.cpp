@@ -85,6 +85,8 @@ NativeSolidSolver::NativeSolidSolver(string str, bool FSIComp):confFile(str){
   posDV.Reset();
   magDV.Initialize(config->GetNumberDesignVariables());
   magDV.Reset();
+  sideDV.Initialize(config->GetNumberDesignVariables());
+  sideDV.Reset();
 
   if(rank == MASTER_NODE){
     if(structure->GetnDof() == 1){
@@ -1428,6 +1430,14 @@ void NativeSolidSolver::setDesignVariableMagnitude(double mag, unsigned long iDV
   }
 }
 
+void NativeSolidSolver::setDesignVariableSide(double side, unsigned long iDV)
+{
+  if (iDV < config->GetNumberDesignVariables())
+  {
+    sideDV[iDV] = side;
+  }
+}
+
 void NativeSolidSolver::applyDesignVariables()
 {
   unsigned short iMarker, iVertex;
@@ -1436,7 +1446,7 @@ void NativeSolidSolver::applyDesignVariables()
   double* Coord0;
 
   iMarker = getFSIMarkerID();
-  if (config->GetDesignVariableKind() == "HICKS_HENNE_SYMMETRIC"){
+  if (config->GetDesignVariableKind() == "HICKS_HENNE"){
     for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
       iPoint = geometry->vertex[iMarker][iVertex];
       Coord0 = geometry->node[iPoint]->GetCoord0();
@@ -1449,9 +1459,22 @@ void NativeSolidSolver::applyDesignVariables()
         newCoord[1] = Coord0[1];
         newCoord[2] = Coord0[2];
         for (unsigned long iDV = 0; iDV < config->GetNumberDesignVariables(); iDV++){
+          double side;
+          switch ((int) sideDV[iDV]){
+          case 1: // Bump in extrados
+            side = (upper+1.)/2.;
+            break;
+          case -1: // Bump in intrados
+            side = (upper-1.)/2.;
+            break;
+          default: // Symmetric bump
+            side = upper;
+            break;
+          }
+          
           double ek = log10(0.5)/log10(posDV[iDV]);
           newCoord[0] = newCoord[0];
-          newCoord[1] = newCoord[1]+upper*magDV[iDV]*pow(sin( M_PI * pow(xk, ek)), 3.0);
+          newCoord[1] = newCoord[1]+side*magDV[iDV]*pow(sin( M_PI * pow(xk, ek)), 3.0);
           newCoord[2] = newCoord[2];
         }
         geometry->node[iPoint]->SetCoord_n(newCoord); // Hacky. I am using Coord_n as the new base coordinate, with the DVs applied
@@ -1488,8 +1511,20 @@ double NativeSolidSolver::getDesignVariableDerivative(unsigned long iDV)
       {
         double upper = copysign(1.0, Coord0[1]); // Differentiate between suction and pressure side. Will fail for some aerofoils...
         double xk = Coord0[0]/config->GetCord();
+        double side;
+        switch ((int) sideDV[iDV]){
+        case 1: // Bump in extrados
+          side = (upper+1.)/2.;
+          break;
+        case -1: // Bump in intrados
+          side = (upper-1.)/2.;
+          break;
+        default: // Symmetric bump
+          side = upper;
+          break;
+        }
         dX = 0.;
-        dY = upper*pow(sin( M_PI * pow(xk, ek)), 3.0);
+        dY = side*pow(sin( M_PI * pow(xk, ek)), 3.0);
         for (unsigned long iInst = 0; iInst < nInst; iInst++)
         {
           dPsi = (integrator->GetSolver()->GetDisp())[iInst+nInst];

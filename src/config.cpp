@@ -9,7 +9,8 @@ using namespace std;
 
 Config::Config(string filename):ConfigFileName(filename)
 {
-
+    // Setting defaults here
+    NUMBER_DESIGN_VARIABLES = 1;
 }
 
 Config::~Config()

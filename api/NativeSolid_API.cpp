@@ -1342,11 +1342,13 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
   unsigned short iVertex, iMarker;
   unsigned long iPoint;
   double AdjDispX(0.0), AdjDispY(0.0), AdjDispZ(0.0);
+  double AdjVelX(0.0), AdjVelY(0.0), AdjVelZ(0.0);
   double CenterX, CenterY, CenterZ;
   double* ExtAdjointDisp;
   double* Coord;
   double dPsi(0.0), sinPsi(0.0), cosPsi(1.0);
   unsigned int offset = instance+2*config->GetNumberHarmonics()+1;
+  unsigned int offset_vel = offset+2*config->GetNumberHarmonics()+1;
   unsigned long nPoint = geometry->GetnPoint();
   
   if (config->GetStructType() == "AIRFOIL")
@@ -1376,7 +1378,7 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
     AdjDispX += structure->Get_Kh()*integrator->GetSolver()->GetDisp()[instance];
     if (structure->GetnDof() == 2)
     {
-      AdjDispY -= structure->Get_Kh()*integrator->GetSolver()->GetDisp()[instance];
+      AdjDispY -= structure->Get_Kh()*integrator->GetSolver()->GetDisp()[instance]; // Negative because the sign of AdjDispY is negative for an airfoil
       AdjDispZ += structure->Get_Ka()*dPsi;
     }
     else
@@ -1385,6 +1387,12 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
     }
     
   }
+  else if (config->GetObjFunction() == "DISSIPATED_PLUNGE_POWER")
+  {
+    AdjVelX += 2*structure->Get_Ch()*integrator->GetSolver()->GetVel()[instance];
+    AdjVelY += 2*structure->Get_Ch()*integrator->GetSolver()->GetVel()[instance];
+  }
+  
   
 
 
@@ -1396,12 +1404,15 @@ void NativeSolidSolver::setTotalAdjointDisplacement(unsigned int instance){
   if(config->GetStructType() == "AIRFOIL"){
     (integrator->GetSolver()->GetAdjDisps())[instance] = -AdjDispY;
     (integrator->GetSolver()->GetAdjDisps())[offset] = AdjDispZ;
+    (integrator->GetSolver()->GetAdjDisps())[offset_vel] = AdjVelY;
   }
   else if(config->GetStructType() == "SPRING_VER"){
     (integrator->GetSolver()->GetAdjDisps())[instance] = AdjDispY;
+    (integrator->GetSolver()->GetAdjDisps())[offset] = AdjVelY;
   }
   else if(config->GetStructType() == "SPRING_HOR"){
     (integrator->GetSolver()->GetAdjDisps())[instance] = AdjDispX;
+    (integrator->GetSolver()->GetAdjDisps())[offset] = AdjVelX;
   }
   else{
     cerr << "Wrong structural type for applying global fluid loads !" << endl;
@@ -1498,7 +1509,7 @@ double NativeSolidSolver::getDesignVariableDerivative(unsigned long iDV)
 
   iMarker = getFSIMarkerID();
   nPoint = geometry->GetnPoint();
-  if (iDV < config->GetNumberDesignVariables() && config->GetDesignVariableKind() == "HICKS_HENNE_SYMMETRIC")
+  if (iDV < config->GetNumberDesignVariables() && config->GetDesignVariableKind() == "HICKS_HENNE")
   {
     double ek = log10(0.5)/log10(posDV[iDV]);
     for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++){
@@ -1549,10 +1560,32 @@ double NativeSolidSolver::getDesignVariableDerivative(unsigned long iDV)
 double NativeSolidSolver::getObjectiveFunction()
 {
   double J = 0.0;
+  unsigned short nInst = 2*getNumberHarmonics()+1;
   if (config->GetObjFunction() == "PITCH_AMPLITUDE")
   {
     J += integrator->GetSolver()->GetAmplitude();
   }
+  else if (config->GetObjFunction() == "ENERGY")
+  {
+    for (unsigned short iInst = 0; iInst < nInst ; iInst++)
+    {
+      double h, alpha;
+      h = (integrator->GetSolver()->GetDisp())[iInst];
+      alpha = (integrator->GetSolver()->GetDisp())[iInst+nInst];
+      J += .5*(structure->Get_Kh())*h*h;
+      J += .5*(structure->Get_Ka())*alpha*alpha;
+    }
+  }
+  else if (config->GetObjFunction() == "DISSIPATED_PLUNGE_POWER")
+  {
+    double hdot;
+    for (unsigned short iInst = 0; iInst < nInst ; iInst++)
+    {
+      hdot = (integrator->GetSolver()->GetVel())[iInst];
+      J += (structure->Get_Ch())*hdot*hdot;
+    }
+  }
+  
   
   return J;
 }
@@ -1644,6 +1677,23 @@ double NativeSolidSolver::getLoadDerivativeZ(unsigned short iVertex){
   else {
     return 0.;
   }
+}
+
+double NativeSolidSolver::getPlungeDampingDerivative()
+{
+  double dJdc = 0.;
+  double hdot;
+  unsigned short nInst = 2*getNumberHarmonics()+1;
+  dJdc += integrator->GetSolver()->GetDampingDerivative(0);
+  if (config->GetObjFunction() == "DISSIPATED_PLUNGE_POWER")
+  {
+    for (unsigned short iInst = 0; iInst < nInst; iInst++)
+    {
+      hdot = (integrator->GetSolver()->GetVel())[iInst];
+      dJdc += hdot*hdot;
+    }
+  }
+  return dJdc;
 }
 
 void NativeSolidSolver::computeInterfaceAdjointLoads(){

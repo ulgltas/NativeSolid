@@ -1019,7 +1019,7 @@ AdjointHarmonicSolver::AdjointHarmonicSolver(unsigned nDof, unsigned nHarmonic, 
   _nOmega = 2*nHarmonic+1;
   AdjointOmega = 0.0;
   cout << "nHarmonic: " << nHarmonic << endl;
-  qDerivative.Initialize(_nDof*_nOmega, 0.0);
+  qDerivative.Initialize(2*_nDof*_nOmega, 0.0);
   AdjointLoad.Initialize(_nDof*_nOmega, 0.);
   LoadGradient.Initialize(_nOmega, _nOmega, 0.);
   ET.Initialize(_nOmega, _nOmega, 0.0);
@@ -1039,6 +1039,7 @@ void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure
   CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain
   CVector qdot_temp(_nOmega, 0.0);
   CVector f_temp(_nOmega, 0.0);
+  CVector fdot_temp(_nOmega, 0.0);
   CVector temp_hold(_nOmega, 0.0); // Temporary hold for the frequency domain things
 
   CVector x_temp(2*_nTotal, 0.0); // Old & new? solution of the state-space problem in the frequency domain
@@ -1098,6 +1099,7 @@ void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure
       q_temp[jOmega] = q[jOmega+dofStart];
       qdot_temp[jOmega] = qdot[jOmega+dofStart];
       f_temp[jOmega] = qDerivative[jOmega+dofStart];
+      fdot_temp[jOmega] = qDerivative[jOmega+dofStart+_nTotal];
     }
     temp_hold = MatVecProd(E, q_temp);
     if (iDof == 1)
@@ -1118,6 +1120,11 @@ void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure
     for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
     {
       RHS[jOmega+dofStart+_nTotal] = temp_hold[jOmega];
+    }
+    temp_hold = MatVecProd(Em1T, fdot_temp);
+    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    {
+      RHS[jOmega+dofStart] = temp_hold[jOmega];
     }
   }
 
@@ -1158,6 +1165,7 @@ void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure
   counter = 0;
   for (unsigned int i = 0; i < _nTotal; i++)
   {
+    Res[_nTotal+i-1] = RHS[i];
     if (i == fDoF)
     {
       continue;

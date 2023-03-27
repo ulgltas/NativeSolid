@@ -88,6 +88,7 @@ public:
     double getLoadDerivativeX(unsigned short iVertex);
     double getLoadDerivativeY(unsigned short iVertex);
     double getLoadDerivativeZ(unsigned short iVertex);
+    double getPlungeDampingDerivative();
     void setTotalAdjointDisplacement(unsigned int instance);
     void setFrequencyDerivative(double dJdw);
     void setDesignVariableCentre(double x, unsigned long iDV);

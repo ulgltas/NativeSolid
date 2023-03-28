@@ -127,6 +127,7 @@ protected:
     CMatrix Em1; // Harmonic balance IFT matrix
 
     bool pitchObjFun; // Pitching amplitude objective function
+    unsigned short fixedDof; // Fixed degree of freedom
 public:
     HarmonicSolver(unsigned nDof, unsigned int nHarmonic, bool bool_linear);
     ~HarmonicSolver();

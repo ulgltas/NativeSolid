@@ -57,6 +57,7 @@ void Config::ReadConfig()
         else if (option == "LINEARIZE") LINEARIZE = text_line;
         else if (option == "INTEGRATION_ALGO") INTEGRATION_ALGO = text_line;
         else if (option == "RESTART_SOL") RESTART_SOL = text_line;
+    else if (option == "FIXED_DOF") FIXED_DOF = text_line;
 	else if (option == "RESTART_FILE") RESTART_FILE = text_line;
 	else if (option == "MOVING_MARKER") MOVING_MARKER = text_line;
 	else if (option == "SPRING_MASS") SPRING_MASS = atof(text_line.c_str());
@@ -115,6 +116,11 @@ std::string Config::GetCSDSolver()
 std::string Config::GetKindProblem()
 {
     return KIND_PROBLEM;
+}
+
+std::string Config::GetFixedDof()
+{
+    return FIXED_DOF;
 }
 
 std::string Config::GetObjFunction()

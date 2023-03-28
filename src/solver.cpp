@@ -782,6 +782,19 @@ void HarmonicSolver::SetInitialState(Config *config, Structure *structure){
   cout << "Damping: " << damping << " Omega^2: " << omegaN2 << " nH: " << nHarmonics << endl;
   SetHBMatrices();
   pitchObjFun = (config->GetObjFunction() == "PITCH_AMPLITUDE");
+  if (config->GetFixedDof() == "PLUNGE")
+  {
+    fixedDof = 0;
+  }
+  else if (config->GetFixedDof() == "NONE")
+  {
+    fixedDof = 127;
+  }
+  else
+  {
+    fixedDof = 1;
+  }
+  
 }
 
 void HarmonicSolver::SetHBMatrices(){
@@ -810,7 +823,7 @@ void HarmonicSolver::SetHBMatrices(){
 
 void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
   unsigned int _nTotal = _nDof*_nOmega;
-  unsigned int fDoF = _nOmega+2; // DoF to be fixed to 0
+  unsigned int fDoF = 2+fixedDof*_nOmega; // DoF to be fixed to 0
   unsigned int counter;
 
   CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain
@@ -904,7 +917,10 @@ void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
   counter = 0;
   for (unsigned int i = 0; i < 2*_nTotal; i++)
   {
-    dRes.SetElm(i+1, 2*_nTotal, dResdw[i]);
+    if (fixedDof < _nDof) // Only add frequency dependence if the dof to be fixed makes sense
+    {
+      dRes.SetElm(i+1, 2*_nTotal, dResdw[i]);
+    }
     if (i == fDoF)
     {
       continue;
@@ -959,7 +975,12 @@ void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
       qddot[jOmega+iDof*_nOmega]  = qddot_temp[jOmega];
     }
   }
-  deltaOmega = Res[2*_nTotal-1];
+  deltaOmega = 0.;
+  if (fixedDof < _nDof)
+  {
+    deltaOmega = Res[2*_nTotal-1];
+  }
+
   omega_n = omega;
 }
 
@@ -1033,7 +1054,7 @@ AdjointHarmonicSolver::~AdjointHarmonicSolver()
 
 void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
   unsigned int _nTotal = _nDof*_nOmega;
-  unsigned int fDoF = _nOmega+2; // DoF to be fixed to 0
+  unsigned int fDoF = 2+fixedDof*_nOmega; // DoF to be fixed to 0
   unsigned int counter;
 
   CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain

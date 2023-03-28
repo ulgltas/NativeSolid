@@ -89,6 +89,7 @@ public:
     double getLoadDerivativeY(unsigned short iVertex);
     double getLoadDerivativeZ(unsigned short iVertex);
     double getPlungeDampingDerivative();
+    void setDamping(unsigned short iDof, double newDamping);
     void setTotalAdjointDisplacement(unsigned int instance);
     void setFrequencyDerivative(double dJdw);
     void setDesignVariableCentre(double x, unsigned long iDV);
@@ -98,4 +99,5 @@ public:
     inline unsigned long getNumberDesignVariables() {return config->GetNumberDesignVariables();};
     double getDesignVariableDerivative(unsigned long iDV);
     double getObjectiveFunction();
+    double getPitchAmplitude();
 };

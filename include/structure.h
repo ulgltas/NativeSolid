@@ -48,5 +48,12 @@ public:
     double Get_Ca() const;
     double Get_S() const;
     double Get_If() const;
+    void Set_m(double newm) {m=newm;};
+    void Set_Kh(double newKh) {Kh=newKh;};
+    void Set_Ka(double newKa) {Ka=newKa;};
+    void Set_Ch(double newCh) {Ch=newCh;};
+    void Set_Ca(double newCa) {Ca=newCa;};
+    void Set_S(double newS) {S=newS;};
+    void Set_If(double newIf) {If=newIf;};
 
 };

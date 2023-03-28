@@ -1593,6 +1593,11 @@ double NativeSolidSolver::getObjectiveFunction()
   return J;
 }
 
+double NativeSolidSolver::getPitchAmplitude()
+{
+  return integrator->GetSolver()->GetAmplitude();
+}
+
 void NativeSolidSolver::applyload(unsigned short iVertex, unsigned int iInst, double Fx, double Fy, double Fz){
 
     unsigned short iMarker;
@@ -1697,6 +1702,23 @@ double NativeSolidSolver::getPlungeDampingDerivative()
     }
   }
   return dJdc;
+}
+
+void NativeSolidSolver::setDamping(unsigned short iDof, double newDamping)
+{
+  if (iDof < structure->GetnDof())
+  {
+    if (iDof == 0)
+    {
+      structure->Set_Ch(newDamping);
+    }
+    else
+    {
+      structure->Set_Ca(newDamping);
+    }
+    
+  }
+  
 }
 
 void NativeSolidSolver::computeInterfaceAdjointLoads(){

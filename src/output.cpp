@@ -63,6 +63,18 @@ void Output::WriteRestart(Integration* integrator, Structure* structure, Config*
   RestartFile.close();
 }
 
+void Output::WriteAdjointOutput(double dampingDer){
+  ofstream AdjointFile;
+
+  AdjointFile.open("solid_gradients.csv", ios::out);
+  AdjointFile.precision(12);
+
+  AdjointFile << "plunge_damping" << endl;
+  AdjointFile << dampingDer << endl;
+
+  AdjointFile.close();
+}
+
 /*void Output::WriteStaticSolution(Config* config, Integration* solver, Structure* structure, ofstream* outputfile){
   if(structure->GetnDof() == 1){
     cout << "Static displacement is : " << (*(solver->GetDisp()))[0] << " [m]" << endl;

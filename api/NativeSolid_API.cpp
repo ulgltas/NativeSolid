@@ -875,6 +875,7 @@ void NativeSolidSolver::writeSolution(double time, int FSIter){
 void NativeSolidSolver::writeAdjointSolution(double time, int FSIter){
 
     int rank = MASTER_NODE;
+    double dampingDer = 0.0;
 
   #ifdef HAVE_MPI
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -906,7 +907,7 @@ void NativeSolidSolver::writeAdjointSolution(double time, int FSIter){
           dRdm = a;
           dEdm += .5*v*v-(integrator->GetSolver()->GetAdjLoads())[iInst]*dRdm;
         }
-
+        dampingDer = getPlungeDampingDerivative();
         for (unsigned short iInst = 0; iInst < nInst ; iInst++)
         {
           historyFile2 << fixed
@@ -959,13 +960,14 @@ void NativeSolidSolver::writeAdjointSolution(double time, int FSIter){
             dJdkh += .5*h*h;
             dJdka += .5*alpha*alpha;
           }
+          dampingDer = getPlungeDampingDerivative();
           historyFile2 << fixed
                        << setw(10) << currentTime
                        << setw(10) << FSIter
                        << setw(15) << Energy
                        << setw(15) << integrator->GetSolver()->GetStiffnessDerivative(0)+dJdkh
                        << setw(15) << integrator->GetSolver()->GetStiffnessDerivative(1)+dJdka
-                       << setw(15) << integrator->GetSolver()->GetDampingDerivative(0)
+                       << setw(15) << dampingDer
                        << setw(15) << integrator->GetSolver()->GetDampingDerivative(1)
                        << setw(15) << integrator->GetSolver()->GetMassDerivative(0)+integrator->GetSolver()->GetImbalanceDerivative()*structure->Get_S()/structure->Get_m()
                        << setw(15) << integrator->GetSolver()->GetMassDerivative(1)
@@ -998,7 +1000,8 @@ void NativeSolidSolver::writeAdjointSolution(double time, int FSIter){
                      << setw(15) << dEdka << endl;
       }
     }
-    }
+  }
+  output->WriteAdjointOutput(dampingDer);
 }
 
 void NativeSolidSolver::updateSolution(){

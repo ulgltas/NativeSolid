@@ -786,13 +786,13 @@ void HarmonicSolver::SetInitialState(Config *config, Structure *structure){
   {
     fixedDof = 0;
   }
-  else if (config->GetFixedDof() == "NONE")
+  else if (config->GetFixedDof() == "PITCH")
   {
-    fixedDof = 127;
+    fixedDof = 1;
   }
   else
   {
-    fixedDof = 1;
+    fixedDof = 127;
   }
   
 }
@@ -894,7 +894,7 @@ void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
     {
       x_temp[jOmega+iDof*_nOmega] = temp_hold[jOmega];
     }
-    temp_hold = MatVecProd(E, qdot_temp);
+    temp_hold = MatVecProd(AA, temp_hold);
     for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
     {
       x_temp[jOmega+iDof*_nOmega+_nTotal] = temp_hold[jOmega];
@@ -917,7 +917,7 @@ void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
   counter = 0;
   for (unsigned int i = 0; i < 2*_nTotal; i++)
   {
-    if (fixedDof < _nDof) // Only add frequency dependence if the dof to be fixed makes sense
+    if (fDoF < 2*_nTotal) // Only add frequency dependence if the dof to be fixed makes sense
     {
       dRes.SetElm(i+1, 2*_nTotal, dResdw[i]);
     }
@@ -960,25 +960,26 @@ void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
     }
 
   }
+  deltaOmega = 0.;
+  if (fixedDof < _nDof)
+  {
+    deltaOmega = Res[2*_nTotal-1];
+  }
   for (unsigned int iDof = 0; iDof < _nDof; iDof++)
   {
     for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
     {
       temp_hold[jOmega] = x_temp[jOmega+iDof*_nOmega+_nTotal]+Res[counter];
       counter++;
+      q_temp[jOmega] = q[jOmega+iDof*_nOmega];
     }
-    qdot_temp = MatVecProd(Em1, temp_hold);
-    qddot_temp = MatVecProd(d, qdot_temp);
+    qdot_temp = MatVecProd(d, q_temp)*(omega+deltaOmega)/omega;
+    qddot_temp = MatVecProd(d, qdot_temp)*(omega+deltaOmega)/omega;
     for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
     {
       qdot[jOmega+iDof*_nOmega]   = qdot_temp[jOmega];
       qddot[jOmega+iDof*_nOmega]  = qddot_temp[jOmega];
     }
-  }
-  deltaOmega = 0.;
-  if (fixedDof < _nDof)
-  {
-    deltaOmega = Res[2*_nTotal-1];
   }
 
   omega_n = omega;

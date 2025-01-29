@@ -1546,13 +1546,13 @@ double NativeSolidSolver::getDesignVariableDerivative(unsigned long iDV)
           Force = geometry->node[iPoint+nPoint*iInst]->GetForce();
           dJdDV += ExtAdjointDisp[0]*sin(dPsi)*dY; // SU2 dJ/dx*dx/dBump
           dJdDV += ExtAdjointDisp[1]*cos(dPsi)*dY; // SU2 dJ/dy*dy/dBump
-          dJdDV -= AdjLoads[nInst+iInst]*Force[1]*sin(dPsi)*dY;
+          dJdDV -= AdjLoads[nInst+iInst]*Force[1]*sin(dPsi)*dY; // RBM dJ/dM*dM/dBump; dMdBump = -Fy*dx/dBump+Fx*dy/dBump
           dJdDV += AdjLoads[nInst+iInst]*Force[0]*cos(dPsi)*dY;
           /*Moment += (Force[1]*(Coord[0]-CenterX) - Force[0]*(Coord[1]-CenterY));
           dMoment += Force[1]*(Coord[1]-CenterY);
           dMoment += Force[0]*(Coord[0]-CenterX); // TODO: Check signs*/
         }
-        
+
       }
     }
 

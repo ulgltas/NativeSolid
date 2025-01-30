@@ -1,5 +1,5 @@
-# NativeSolid
-Native solid solver for FSI
+# NativeSolid / RBM
+Native solid solver for [CUPyDO](https://github.com/ulgltas/CUPyDO)
 
 ## Features
 Compute static or dynamic displacements for several 2D configurations.
@@ -17,30 +17,16 @@ Compute static or dynamic displacements for several 2D configurations.
 * Static Computation
   - Stiffness term only
 
-## Compilation (linux -gcc)
-Installation of NativeSolid code
+## Build
 
 Required packages
 ```
-sudo apt-get install build-essential
-sudo apt-get install cmake
-sudo apt-get install liblapacke-dev
-sudo apt-get install liblatlas-base-dev
+sudo apt install build-essential cmake libopenblas-dev liblapacke-dev libpython3-dev swig
 ```
-Optional packages (parallel build)
-```
-sudo apt-get install openmpi-bin openmpi-common libopenmpi-dev
-```
-Compilation (you might need to set paths for headers and libraries in the FindCBLAS and FindLAPACKE files)
+
 ```
 mkdir build && cd build
 cmake ..
-make -j4
+make -j 4
 ```
-Environment variables
-```
-gedit /home/"username"/.bashrc
-export NATIVE_RUN="INSTALL_PATH/NativeSolid/bin"
-export PATH=$PATH:$NATIVE_RUN
-export PYTHONPATH=$PYTHONPATH:$NATIVE_RUN
-	
+

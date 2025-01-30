@@ -1,1324 +1,1390 @@
-#include "../include/solver.h"
-#include "../include/structure.h"
-#include "../include/MatVec.h"
-
+#include "Solver.h"
+#include "Structure.h"
+#include "MatVec.h"
 #include <iostream>
 #include <fstream>
 #include <cmath>
 
-using namespace std;
+Solver::Solver(unsigned int nDof, bool bool_linear)
+{
+    q.Initialize(nDof, 0.0);
+    qdot.Initialize(nDof, 0.0);
+    qddot.Initialize(nDof, 0.0);
+    q_n.Initialize(nDof, 0.0);
+    qdot_n.Initialize(nDof, 0.0);
+    qddot_n.Initialize(nDof, 0.0);
+    Loads.Initialize(nDof, 0.0);
+    Loads_n.Initialize(nDof, 0.0);
 
-/* CLASS SOLVER*/
-Solver::Solver(unsigned int nDof, bool bool_linear){
+    ResetSolution();
+    Loads.Reset();
+    Loads_n.Reset();
 
-  q.Initialize(nDof, 0.0);
-  qdot.Initialize(nDof, 0.0);
-  qddot.Initialize(nDof, 0.0);
-  q_n.Initialize(nDof, 0.0);
-  qdot_n.Initialize(nDof, 0.0);
-  qddot_n.Initialize(nDof, 0.0);
-  Loads.Initialize(nDof, 0.0);
-  Loads_n.Initialize(nDof, 0.0);
-
-  ResetSolution();
-  Loads.Reset();
-  Loads_n.Reset();
-
-  linear = bool_linear;
+    linear = bool_linear;
 }
 
-Solver::~Solver(){}
-
-void Solver::Iterate(double &t0, double &tf, Structure* structure){}
-
-CVector & Solver::GetDisp(){
-  return q;
+Solver::~Solver()
+{
 }
 
-CVector & Solver::GetVel(){
-  return qdot;
+void Solver::Iterate(double &t0, double &tf, Structure *structure)
+{
 }
 
-CVector & Solver::GetAcc(){
-  return qddot;
+CVector &Solver::GetDisp()
+{
+    return q;
 }
 
-CVector & Solver::GetDisp_n(){
-  return q_n;
+CVector &Solver::GetVel()
+{
+    return qdot;
 }
 
-CVector & Solver::GetVel_n(){
-  return qdot_n;
+CVector &Solver::GetAcc()
+{
+    return qddot;
 }
 
-CVector & Solver::GetAcc_n(){
-  return qddot_n;
+CVector &Solver::GetDisp_n()
+{
+    return q_n;
 }
 
-CVector & Solver::GetLoads(){
-  return Loads;
+CVector &Solver::GetVel_n()
+{
+    return qdot_n;
 }
 
-CVector & Solver::GetAccVar(){
-  return a;
+CVector &Solver::GetAcc_n()
+{
+    return qddot_n;
 }
 
-CVector & Solver::GetAccVar_n(){
-  return a_n;
+CVector &Solver::GetLoads()
+{
+    return Loads;
 }
 
-CVector & Solver::GetAdjLoads(){
-  return a_n;
+CVector &Solver::GetAccVar()
+{
+    return a;
 }
 
-CVector & Solver::GetAdjDisps(){
-  return a_n;
+CVector &Solver::GetAccVar_n()
+{
+    return a_n;
 }
 
-void Solver::ResetSolution(){
-  q.Reset();
-  qdot.Reset();
-  qddot.Reset();
-  q_n.Reset();
-  qdot_n.Reset();
-  qddot_n.Reset();
+CVector &Solver::GetAdjLoads()
+{
+    return a_n;
 }
 
-void Solver::SaveToThePast(){
-  q_n = q;
-  qdot_n = qdot;
-  qddot_n = qddot;
-  Loads_n = Loads;
+CVector &Solver::GetAdjDisps()
+{
+    return a_n;
 }
 
-void Solver::SetInitialState(Config *config, Structure* structure){}
-
-void Solver::SetStates(unsigned int iInstance, unsigned int dof,  double displacement){}
-
-/*CLASS ALPHAGENSOLVER*/
-AlphaGenSolver::AlphaGenSolver(unsigned int nDof, double val_rho, bool bool_linear) : Solver(nDof, bool_linear) {
-
-  a.Initialize(nDof, 0.0);
-  a_n.Initialize(nDof, 0.0);
-
-  rho = val_rho;
-  alpha_m = (2*rho-1)/(rho+1);
-  alpha_f = rho/(rho+1);
-  gamma = 0.5+alpha_f-alpha_m;
-  beta = 0.25*pow((gamma+0.5),2);
-  cout << "Integration with the alpha-generalized algorithm :" << endl;
-  cout << "rho : " << rho << endl;
-  cout << "alpha_m : " << alpha_m << endl;
-  cout << "alpha_f : " << alpha_f << endl;
-  cout << "gamma : " << gamma << endl;
-  cout << "beta : " << beta << endl;
-}
-
-AlphaGenSolver::~AlphaGenSolver() {}
-
-CVector & AlphaGenSolver::GetAccVar(){
-  return a;
-}
-
-CVector & AlphaGenSolver::GetAccVar_n(){
-  return a_n;
-}
-
-void AlphaGenSolver::Iterate(double &t0, double &tf, Structure *structure){
-
-  double deltaT(tf-t0), epsilon(1e-6);
-  int nMaxIter(1000), nIter(0);
-
-  gammaPrime = gamma/(deltaT*beta);
-  betaPrime = (1-alpha_m)/(pow(deltaT,2)*beta*(1-alpha_f));
-
-  /*--- Prediction phase ---*/
-  qddot.Reset();
-  a.Reset();
-
-  a += ScalVecProd(alpha_f/(1-alpha_m),qddot_n);
-  a -= ScalVecProd(alpha_m/(1-alpha_m),a_n);
-
-  q = q_n;
-  q += ScalVecProd(deltaT,qdot_n);
-  q += ScalVecProd((0.5-beta)*deltaT*deltaT,a_n);
-  q += ScalVecProd(deltaT*deltaT*beta,a);
-
-  qdot = qdot_n;
-  qdot += ScalVecProd((1-gamma)*deltaT,a_n);
-  qdot += ScalVecProd(deltaT*gamma,a);
-
-  /*--- Tangent operator and corrector computation ---*/
-  CVector res(qddot.GetSize(), 0.0);
-  CVector Deltaq(qddot.GetSize(), 0.0);
-  CMatrix St(qddot.GetSize(), qddot.GetSize(), 0.0);
-  ComputeResidual(structure,res);
-  while (res.norm() >= epsilon && nIter < nMaxIter){
-    St.Reset();
-    ComputeTangentOperator(structure,St);
-    SolveSys(St,res);
-    //*res -= ScalVecProd(double(2),res); //=deltaq
-    Deltaq.Reset();
-    Deltaq += ScalVecProd(-1,res);
-    q += Deltaq;
-    qdot += ScalVecProd(gammaPrime,Deltaq);
-    qddot += ScalVecProd(betaPrime,Deltaq);
-    res.Reset();
-    ComputeResidual(structure,res);
-    nIter++;
-  }
-  a += ScalVecProd((1-alpha_f)/(1-alpha_m),qddot);
-
-}
-
-void AlphaGenSolver::ComputeRHS(Structure* structure, CVector &RHS){
-
-  unsigned long size = q.GetSize();
-  CMatrix CC(size, size, 0.0);
-  CMatrix KK(size, size, 0.0);
-  CVector NonLinTerm(size, 0.0);
-
-  double cos_a;
-
-
-  if(structure->GetnDof() == 1){
-    KK.SetElm(1,1,structure->Get_Kh());
-    CC.SetElm(1,1,structure->Get_Ch());
-  }
-  else if(structure->GetnDof() == 2){
-    if(linear){
-      cos_a = 1.0;
-    }
-    else{
-      cos_a = cos(q[1]);
-      NonLinTerm[0] = (structure->Get_S())*sin(q[1])*pow(qdot[1],2);
-    }
-    CC.SetElm(1,1,structure->Get_Ch());
-    CC.SetElm(2,2,structure->Get_Ca());
-    KK.SetElm(1,1,structure->Get_Kh());
-    KK.SetElm(2,2,structure->Get_Ka());
-  }
-  else{
-
-  }
-
-  RHS += Loads;
-  RHS -= MatVecProd(CC, qdot);
-  RHS -= MatVecProd(KK, q);
-  RHS += NonLinTerm;
-}
-
-void AlphaGenSolver::ComputeResidual(Structure *structure, CVector & res){
-
-  res.Reset();
-
-  unsigned long size = q.GetSize();
-  CMatrix MM(size, size, 0.0);
-  double cos_a;
-
-
-  if(structure->GetnDof() == 1){
-    MM.SetElm(1,1, structure->Get_m());
-  }
-  else if(structure->GetnDof() == 2){
-    if(linear){
-      cos_a = 1.0;
-    }
-    else{
-      cos_a = cos(q[1]);
-    }
-    MM.SetElm(1,1, structure->Get_m());
-    MM.SetElm(1,2,(structure->Get_S())*cos_a);
-    MM.SetElm(2,1,(structure->Get_S())*cos_a);
-    MM.SetElm(2,2,structure->Get_If());
-  }
-  else{
-
-  }
-
-  CVector RHS(size, 0.0);
-  ComputeRHS(structure, RHS);
-
-  res = MatVecProd(MM, qddot) - RHS;
-}
-
-void AlphaGenSolver::ComputeTangentOperator(Structure* structure, CMatrix &St){
-
-  St.Reset();
-
-  unsigned long size = q.GetSize();
-  CMatrix MM(size, size, 0.0);
-  CMatrix Ct(size, size, 0.0);
-  CMatrix Kt(size, size, 0.0);
-
-  if(structure->GetnDof() == 1){
-    MM.SetElm(1,1, structure->Get_m());
-    Kt.SetElm(1,1,(structure->Get_Kh()));
-    Ct.SetElm(1,1,(structure->Get_Ch()));
-  }
-  else if(structure->GetnDof() == 2){
-    if(linear){
-      MM.SetElm(1,1, structure->Get_m());
-      MM.SetElm(1,2,(structure->Get_S()));
-      MM.SetElm(2,1,(structure->Get_S()));
-      MM.SetElm(2,2,structure->Get_If());
-      Ct.SetElm(1,1,(structure->Get_Ch()));
-      Ct.SetElm(2,2,(structure->Get_Ca()));
-      Kt.SetElm(1,1,(structure->Get_Kh()));
-      Kt.SetElm(2,2,(structure->Get_Ka()));
-    }
-    else{
-      MM.SetElm(1,1, structure->Get_m());
-      MM.SetElm(1,2,(structure->Get_S())*cos(q[1]));
-      MM.SetElm(2,1,(structure->Get_S())*cos(q[1]));
-      MM.SetElm(2,2,structure->Get_If());
-      Ct.SetElm(1,1,-(structure->Get_Ch()));
-      Ct.SetElm(1,2,(structure->Get_S())*sin(q[1])*2*qdot[1]);
-      Ct.SetElm(2,2,-(structure->Get_Ca()));
-      Kt.SetElm(1,1,-(structure->Get_Kh()));
-      Kt.SetElm(1,2,(structure->Get_S())*cos(q[1])*pow(qdot[1],2));
-      Kt.SetElm(2,2,-(structure->Get_Ka()));
-    }
-
-  }
-  else{
-
-  }
-
-  St += ScalMatProd(betaPrime, MM);
-  St += ScalMatProd(gammaPrime, Ct);
-  St += Kt;
-
-}
-
-void AlphaGenSolver::ResetSolution(){
-
-  Solver::ResetSolution();
-  a.Reset();
-  a_n.Reset();
-}
-
-void AlphaGenSolver::SaveToThePast(){
-
-  Solver::SaveToThePast();
-  a_n = a;
-
-}
-
-void AlphaGenSolver::SetInitialState(Config* config, Structure* structure){
-
-  if(config->GetRestartSol() == "YES"){
-    string InputFileName = config->GetRestartFile();
-    string text_line;
-    string token, tempString;
-    size_t pos;
-    string delimiter = "\t";
-    ifstream InputFile;
-    InputFile.open(InputFileName.c_str(), ios::in);
-    double buffer[(4*structure->GetnDof())+1];
-    int kk = 0;
-    int jj;
-    while (getline(InputFile,text_line)){
-      tempString = text_line;
-      jj = 0;
-      if (kk == 1){
-        while ((pos = tempString.find(delimiter)) != string::npos){
-          token = tempString.substr(0,pos);
-          tempString.erase(0,pos+delimiter.length());
-          buffer[jj] = atof(token.c_str());
-          jj += 1;
-        }
-        buffer[jj] = atof(tempString.c_str());
-
-        if(structure->GetnDof() == 1){
-          q_n[0] = buffer[1];
-          qdot_n[0] = buffer[2];
-          qddot_n[0] = buffer[3];
-          a_n[0] = buffer[4];
-        }
-        else if (structure->GetnDof() == 2){
-          q_n[0] = buffer[1];
-          q_n[1] = buffer[2];
-          qdot_n[0] = buffer[3];
-          qdot_n[1] = buffer[4];
-          qddot_n[0] = buffer[5];
-          qddot_n[1] = buffer[6];
-          a_n[0] = buffer[7];
-          a_n[1] = buffer[8];
-        }
-        q_n.print();
-        qdot_n.print();
-        qddot_n.print();
-        a_n.print();
-      }
-      else if (kk == 2){
-        while ((pos = tempString.find(delimiter)) != string::npos){
-          token = tempString.substr(0,pos);
-          tempString.erase(0,pos+delimiter.length());
-          buffer[jj] = atof(token.c_str());
-          jj += 1;
-        }
-        buffer[jj] = atof(tempString.c_str());
-
-        if(structure->GetnDof() == 1){
-          q[0] = buffer[1];
-          qdot[0] = buffer[2];
-          qddot[0] = buffer[3];
-          a[0] = buffer[4];
-        }
-        else if (structure->GetnDof() == 2){
-          q[0] = buffer[1];
-          q[1] = buffer[2];
-          qdot[0] = buffer[3];
-          qdot[1] = buffer[4];
-          qddot[0] = buffer[5];
-          qddot[1] = buffer[6];
-          a[0] = buffer[7];
-          a[1] = buffer[8];
-        }
-        q.print();
-        qdot.print();
-        qddot.print();
-        a.print();
-      }
-      kk += 1;
-    }
-    InputFile.close();
-  }
-  else{
-    cout << "Setting basic initial conditions for alpha-Gen" << endl;
+void Solver::ResetSolution()
+{
     q.Reset();
-    q_n.Reset();
-    cout << "Read initial configuration" << endl;
-    q[0] = config->GetInitialDisp();
-    if(structure->GetnDof() == 2) q[1] = config->GetInitialAngle();
-    cout << "Initial plunging displacement : " << q[0] << endl;
-    cout << "Initial pitching displacement : " << q[1] << endl;
-
     qdot.Reset();
     qddot.Reset();
+    q_n.Reset();
+    qdot_n.Reset();
+    qddot_n.Reset();
+}
+
+void Solver::SaveToThePast()
+{
+    q_n = q;
+    qdot_n = qdot;
+    qddot_n = qddot;
+    Loads_n = Loads;
+}
+
+void Solver::SetInitialState(Config *config, Structure *structure)
+{
+}
+
+void Solver::SetStates(unsigned int iInstance, unsigned int dof, double displacement) {}
+
+// CLASS ALPHAGENSOLVER
+AlphaGenSolver::AlphaGenSolver(unsigned int nDof, double val_rho,
+                               bool bool_linear) : Solver(nDof, bool_linear)
+{
+    a.Initialize(nDof, 0.0);
+    a_n.Initialize(nDof, 0.0);
+
+    rho = val_rho;
+    alpha_m = (2 * rho - 1) / (rho + 1);
+    alpha_f = rho / (rho + 1);
+    gamma = 0.5 + alpha_f - alpha_m;
+    beta = 0.25 * pow((gamma + 0.5), 2);
+    std::cout << "Integration with the alpha-generalized algorithm :" << std::endl;
+    std::cout << "rho : " << rho << std::endl;
+    std::cout << "alpha_m : " << alpha_m << std::endl;
+    std::cout << "alpha_f : " << alpha_f << std::endl;
+    std::cout << "gamma : " << gamma << std::endl;
+    std::cout << "beta : " << beta << std::endl;
+}
+
+AlphaGenSolver::~AlphaGenSolver()
+{
+}
+
+CVector &AlphaGenSolver::GetAccVar()
+{
+    return a;
+}
+
+CVector &AlphaGenSolver::GetAccVar_n()
+{
+    return a_n;
+}
+
+void AlphaGenSolver::Iterate(double &t0, double &tf, Structure *structure)
+{
+
+    double deltaT(tf - t0), epsilon(1e-6);
+    int nMaxIter(1000), nIter(0);
+
+    gammaPrime = gamma / (deltaT * beta);
+    betaPrime = (1 - alpha_m) / (pow(deltaT, 2) * beta * (1 - alpha_f));
+
+    //--- Prediction phase ---
+    qddot.Reset();
+    a.Reset();
+
+    a += ScalVecProd(alpha_f / (1 - alpha_m), qddot_n);
+    a -= ScalVecProd(alpha_m / (1 - alpha_m), a_n);
+
+    q = q_n;
+    q += ScalVecProd(deltaT, qdot_n);
+    q += ScalVecProd((0.5 - beta) * deltaT * deltaT, a_n);
+    q += ScalVecProd(deltaT * deltaT * beta, a);
+
+    qdot = qdot_n;
+    qdot += ScalVecProd((1 - gamma) * deltaT, a_n);
+    qdot += ScalVecProd(deltaT * gamma, a);
+
+    //--- Tangent operator and corrector computation ---
+    CVector res(qddot.GetSize(), 0.0);
+    CVector Deltaq(qddot.GetSize(), 0.0);
+    CMatrix St(qddot.GetSize(), qddot.GetSize(), 0.0);
+    ComputeResidual(structure, res);
+    while (res.norm() >= epsilon && nIter < nMaxIter)
+    {
+        St.Reset();
+        ComputeTangentOperator(structure, St);
+        SolveSys(St, res);
+        //*res -= ScalVecProd(double(2),res); //=deltaq
+        Deltaq.Reset();
+        Deltaq += ScalVecProd(-1, res);
+        q += Deltaq;
+        qdot += ScalVecProd(gammaPrime, Deltaq);
+        qddot += ScalVecProd(betaPrime, Deltaq);
+        res.Reset();
+        ComputeResidual(structure, res);
+        nIter++;
+    }
+    a += ScalVecProd((1 - alpha_f) / (1 - alpha_m), qddot);
+}
+
+void AlphaGenSolver::ComputeRHS(Structure *structure, CVector &RHS)
+{
 
     unsigned long size = q.GetSize();
-    CVector RHS(size, 0.0);
+    CMatrix CC(size, size, 0.0);
+    CMatrix KK(size, size, 0.0);
+    CVector NonLinTerm(size, 0.0);
+
+    double cos_a;
+
+    if (structure->GetnDof() == 1)
+    {
+        KK.SetElm(1, 1, structure->Get_Kh());
+        CC.SetElm(1, 1, structure->Get_Ch());
+    }
+    else if (structure->GetnDof() == 2)
+    {
+        if (linear)
+        {
+            cos_a = 1.0;
+        }
+        else
+        {
+            cos_a = cos(q[1]);
+            NonLinTerm[0] = (structure->Get_S()) * sin(q[1]) * pow(qdot[1], 2);
+        }
+        CC.SetElm(1, 1, structure->Get_Ch());
+        CC.SetElm(2, 2, structure->Get_Ca());
+        KK.SetElm(1, 1, structure->Get_Kh());
+        KK.SetElm(2, 2, structure->Get_Ka());
+    }
+
+    RHS += Loads;
+    RHS -= MatVecProd(CC, qdot);
+    RHS -= MatVecProd(KK, q);
+    RHS += NonLinTerm;
+}
+
+void AlphaGenSolver::ComputeResidual(Structure *structure, CVector &res)
+{
+
+    res.Reset();
+
+    unsigned long size = q.GetSize();
     CMatrix MM(size, size, 0.0);
-
     double cos_a;
 
-
-    if(structure->GetnDof() == 1){
-      MM.SetElm(1,1, structure->Get_m());
+    if (structure->GetnDof() == 1)
+    {
+        MM.SetElm(1, 1, structure->Get_m());
     }
-    else if(structure->GetnDof() == 2){
-      if(linear){
-        cos_a = 1.0;
-      }
-      else{
-        cos_a = cos(q[1]);
-      }
-      MM.SetElm(1,1, structure->Get_m());
-      MM.SetElm(1,2,(structure->Get_S())*cos_a);
-      MM.SetElm(2,1,(structure->Get_S())*cos_a);
-      MM.SetElm(2,2,structure->Get_If());
+    else if (structure->GetnDof() == 2)
+    {
+        if (linear)
+        {
+            cos_a = 1.0;
+        }
+        else
+        {
+            cos_a = cos(q[1]);
+        }
+        MM.SetElm(1, 1, structure->Get_m());
+        MM.SetElm(1, 2, (structure->Get_S()) * cos_a);
+        MM.SetElm(2, 1, (structure->Get_S()) * cos_a);
+        MM.SetElm(2, 2, structure->Get_If());
     }
-    else{
 
-    }
-
+    CVector RHS(size, 0.0);
     ComputeRHS(structure, RHS);
-    SolveSys(MM, RHS);
-    qddot = RHS;
-    a = qddot;
 
-  }
+    res = MatVecProd(MM, qddot) - RHS;
 }
 
-/*CLASS RK4 SOLVER*/
-RK4Solver::RK4Solver(unsigned nDof, bool bool_linear) : Solver(nDof, bool_linear){
-  size = nDof;
-  lastTime = 0.0;
-  currentTime = 0.0;
-}
+void AlphaGenSolver::ComputeTangentOperator(Structure *structure, CMatrix &St)
+{
 
-RK4Solver::~RK4Solver(){}
+    St.Reset();
 
-void RK4Solver::Iterate(double& t0, double& tf, Structure *structure){
+    unsigned long size = q.GetSize();
+    CMatrix MM(size, size, 0.0);
+    CMatrix Ct(size, size, 0.0);
+    CMatrix Kt(size, size, 0.0);
 
-  double h = tf-t0;
-  lastTime = t0;
-  currentTime = tf;
-
-  CVector k1(2*size);
-  CVector k2(2*size);
-  CVector k3(2*size);
-  CVector k4(2*size);
-
-  CVector state0(2*size);
-  CVector statef(2*size);
-  CVector statef_dot(2*size);
-  state0 = SetState_n();
-
-  CVector TEMP(2*size);
-
-  EvaluateStateDerivative(lastTime, state0, k1, structure);
-  TEMP = state0+(k1*(h/2.0));
-  EvaluateStateDerivative(lastTime+h/2.0, TEMP, k2, structure);
-  TEMP = state0+(k2*(h/2.0));
-  EvaluateStateDerivative(lastTime+h/2.0, TEMP, k3, structure);
-  TEMP = state0+(k3*h);
-  EvaluateStateDerivative(lastTime+h, TEMP, k4, structure);
-
-  statef = state0 + ((k1 + k2*2.0 + k3*2.0 + k4)*(h/6.0));
-
-  EvaluateStateDerivative(lastTime+h, statef, statef_dot, structure);
-
-  if(structure->GetnDof() == 1){
-    q[0] = statef[0];
-    qdot[0] = statef[1];
-    qddot[0] = statef_dot[1];
-  }
-  else if (structure->GetnDof() == 2){
-    q[0] = statef[0];
-    q[1] = statef[1];
-    qdot[0] = statef[2];
-    qdot[1] = statef[3];
-    qddot[0] = statef_dot[2];
-    qddot[1] = statef_dot[3];
-  }
-  else{
-
-  }
-}
-
-void RK4Solver::EvaluateStateDerivative(double tCurrent, CVector &state, CVector &stateDerivative, Structure* structure){
-
-  CVector stateLoads(size, 0.0);
-  interpLoads(tCurrent, stateLoads);
-
-  CMatrix MM(size, size, 0.0);
-  CMatrix CC(size, size, 0.0);
-  CMatrix KK(size, size, 0.0);
-  CVector NonLinTerm(size, 0.0);
-  CVector RHS(size, 0.0);  
-
-  CVector q_current(size, 0.0);
-  CVector qdot_current(size, 0.0);
-  CVector qddot_current(size, 0.0);
-
-  if(structure->GetnDof() == 1){
-    MM.SetElm(1,1, structure->Get_m());
-    KK.SetElm(1,1,structure->Get_Kh());
-    CC.SetElm(1,1,structure->Get_Ch());
-    q_current[0] = state[0];
-    qdot_current[0] = state[1];
-    stateDerivative[0] = state[1];
-  }
-  else if (structure->GetnDof() == 2){
-    double cos_a;
-    if(linear){
-      cos_a = 1.0;
+    if (structure->GetnDof() == 1)
+    {
+        MM.SetElm(1, 1, structure->Get_m());
+        Kt.SetElm(1, 1, (structure->Get_Kh()));
+        Ct.SetElm(1, 1, (structure->Get_Ch()));
     }
-    else{
-      cos_a = cos(state[1]);
-      NonLinTerm[0] = (structure->Get_S())*sin(state[1])*pow(state[3],2);
+    else if (structure->GetnDof() == 2)
+    {
+        if (linear)
+        {
+            MM.SetElm(1, 1, structure->Get_m());
+            MM.SetElm(1, 2, (structure->Get_S()));
+            MM.SetElm(2, 1, (structure->Get_S()));
+            MM.SetElm(2, 2, structure->Get_If());
+            Ct.SetElm(1, 1, (structure->Get_Ch()));
+            Ct.SetElm(2, 2, (structure->Get_Ca()));
+            Kt.SetElm(1, 1, (structure->Get_Kh()));
+            Kt.SetElm(2, 2, (structure->Get_Ka()));
+        }
+        else
+        {
+            MM.SetElm(1, 1, structure->Get_m());
+            MM.SetElm(1, 2, (structure->Get_S()) * cos(q[1]));
+            MM.SetElm(2, 1, (structure->Get_S()) * cos(q[1]));
+            MM.SetElm(2, 2, structure->Get_If());
+            Ct.SetElm(1, 1, -(structure->Get_Ch()));
+            Ct.SetElm(1, 2, (structure->Get_S()) * sin(q[1]) * 2 * qdot[1]);
+            Ct.SetElm(2, 2, -(structure->Get_Ca()));
+            Kt.SetElm(1, 1, -(structure->Get_Kh()));
+            Kt.SetElm(1, 2, (structure->Get_S()) * cos(q[1]) * pow(qdot[1], 2));
+            Kt.SetElm(2, 2, -(structure->Get_Ka()));
+        }
     }
-    MM.SetElm(1,1, structure->Get_m());
-    MM.SetElm(1,2,(structure->Get_S())*cos_a);
-    MM.SetElm(2,1,(structure->Get_S())*cos_a);
-    MM.SetElm(2,2,structure->Get_If());
-    CC.SetElm(1,1,structure->Get_Ch());
-    CC.SetElm(2,2,structure->Get_Ca());
-    KK.SetElm(1,1,structure->Get_Kh());
-    KK.SetElm(2,2,structure->Get_Ka());
-    q_current[0] = state[0];
-    q_current[1] = state[1];
-    qdot_current[0] = state[2];
-    qdot_current[1] = state[3];
-    stateDerivative[0] = state[2];
-    stateDerivative[1] = state[3];
-  }
-  else{
 
-  }
-
-  RHS += stateLoads;
-  RHS -= MatVecProd(CC, qdot_current);
-  RHS -= MatVecProd(KK, q_current);
-  RHS += NonLinTerm;
-
-  SolveSys(MM, RHS);
-  qddot_current = RHS;
-
-  if(structure->GetnDof() == 1){
-    stateDerivative[1] = qddot_current[0];
-  }
-  else if (structure->GetnDof() == 2){
-    stateDerivative[2] = qddot_current[0];
-    stateDerivative[3] = qddot_current[1];
-  }
-  else{
-
-  }
-
+    St += ScalMatProd(betaPrime, MM);
+    St += ScalMatProd(gammaPrime, Ct);
+    St += Kt;
 }
 
-void RK4Solver::interpLoads(double &tCurrent, CVector &val_loads){
-
-  if (lastTime != currentTime){
-    val_loads[0] = (Loads[0] - Loads_n[0])/(currentTime-lastTime)*(tCurrent - lastTime) + Loads_n[0];
-    if(size == 2) val_loads[1] = (Loads[1] - Loads_n[1])/(currentTime-lastTime)*(tCurrent - lastTime) + Loads_n[1];
-  }
-  else{
-    val_loads[0] = Loads[0];
-    if(size == 2) val_loads[1] = Loads[1];
-  }
+void AlphaGenSolver::ResetSolution()
+{
+    Solver::ResetSolution();
+    a.Reset();
+    a_n.Reset();
 }
 
-void RK4Solver::SetInitialState(Config *config, Structure *structure){
+void AlphaGenSolver::SaveToThePast()
+{
 
-  if (config->GetRestartSol() == "YES"){
+    Solver::SaveToThePast();
+    a_n = a;
+}
 
-  }
-  else{
-    cout << "Setting basic initial conditions for RK4" << endl;
-    q.Reset();
-    q_n.Reset();
-    cout << "Read initial configuration" << endl;
-    q[0] = config->GetInitialDisp();
-    if(structure->GetnDof() == 2) q[1] = config->GetInitialAngle();
-    cout << "Initial plunging displacement : " << q[0] << endl;
-    cout << "Initial pitching displacement : " << q[1] << endl;
-    qdot.Reset();
+void AlphaGenSolver::SetInitialState(Config *config, Structure *structure)
+{
 
+    if (config->GetRestartSol() == "YES")
+    {
+        std::string InputFileName = config->GetRestartFile();
+        std::string text_line;
+        std::string token, tempString;
+        size_t pos;
+        std::string delimiter = "\t";
+        std::ifstream InputFile;
+        InputFile.open(InputFileName.c_str(), std::ios::in);
+        double buffer[(4 * structure->GetnDof()) + 1];
+        int kk = 0;
+        int jj;
+        while (getline(InputFile, text_line))
+        {
+            tempString = text_line;
+            jj = 0;
+            if (kk == 1)
+            {
+                while ((pos = tempString.find(delimiter)) != std::string::npos)
+                {
+                    token = tempString.substr(0, pos);
+                    tempString.erase(0, pos + delimiter.length());
+                    buffer[jj] = atof(token.c_str());
+                    jj += 1;
+                }
+                buffer[jj] = atof(tempString.c_str());
+
+                if (structure->GetnDof() == 1)
+                {
+                    q_n[0] = buffer[1];
+                    qdot_n[0] = buffer[2];
+                    qddot_n[0] = buffer[3];
+                    a_n[0] = buffer[4];
+                }
+                else if (structure->GetnDof() == 2)
+                {
+                    q_n[0] = buffer[1];
+                    q_n[1] = buffer[2];
+                    qdot_n[0] = buffer[3];
+                    qdot_n[1] = buffer[4];
+                    qddot_n[0] = buffer[5];
+                    qddot_n[1] = buffer[6];
+                    a_n[0] = buffer[7];
+                    a_n[1] = buffer[8];
+                }
+                q_n.print();
+                qdot_n.print();
+                qddot_n.print();
+                a_n.print();
+            }
+            else if (kk == 2)
+            {
+                while ((pos = tempString.find(delimiter)) != std::string::npos)
+                {
+                    token = tempString.substr(0, pos);
+                    tempString.erase(0, pos + delimiter.length());
+                    buffer[jj] = atof(token.c_str());
+                    jj += 1;
+                }
+                buffer[jj] = atof(tempString.c_str());
+
+                if (structure->GetnDof() == 1)
+                {
+                    q[0] = buffer[1];
+                    qdot[0] = buffer[2];
+                    qddot[0] = buffer[3];
+                    a[0] = buffer[4];
+                }
+                else if (structure->GetnDof() == 2)
+                {
+                    q[0] = buffer[1];
+                    q[1] = buffer[2];
+                    qdot[0] = buffer[3];
+                    qdot[1] = buffer[4];
+                    qddot[0] = buffer[5];
+                    qddot[1] = buffer[6];
+                    a[0] = buffer[7];
+                    a[1] = buffer[8];
+                }
+                q.print();
+                qdot.print();
+                qddot.print();
+                a.print();
+            }
+            kk += 1;
+        }
+        InputFile.close();
+    }
+    else
+    {
+        std::cout << "Setting basic initial conditions for alpha-Gen" << std::endl;
+        q.Reset();
+        q_n.Reset();
+        std::cout << "Read initial configuration" << std::endl;
+        q[0] = config->GetInitialDisp();
+        if (structure->GetnDof() == 2)
+            q[1] = config->GetInitialAngle();
+        std::cout << "Initial plunging displacement : " << q[0] << std::endl;
+        std::cout << "Initial pitching displacement : " << q[1] << std::endl;
+
+        qdot.Reset();
+        qddot.Reset();
+
+        unsigned long size = q.GetSize();
+        CVector RHS(size, 0.0);
+        CMatrix MM(size, size, 0.0);
+
+        double cos_a;
+
+        if (structure->GetnDof() == 1)
+        {
+            MM.SetElm(1, 1, structure->Get_m());
+        }
+        else if (structure->GetnDof() == 2)
+        {
+            if (linear)
+            {
+                cos_a = 1.0;
+            }
+            else
+            {
+                cos_a = cos(q[1]);
+            }
+            MM.SetElm(1, 1, structure->Get_m());
+            MM.SetElm(1, 2, (structure->Get_S()) * cos_a);
+            MM.SetElm(2, 1, (structure->Get_S()) * cos_a);
+            MM.SetElm(2, 2, structure->Get_If());
+        }
+
+        ComputeRHS(structure, RHS);
+        SolveSys(MM, RHS);
+        qddot = RHS;
+        a = qddot;
+    }
+}
+
+// CLASS RK4 SOLVER
+RK4Solver::RK4Solver(unsigned nDof, bool bool_linear) : Solver(nDof, bool_linear)
+{
+    size = nDof;
     lastTime = 0.0;
     currentTime = 0.0;
-
-    qddot.Reset();
-    CVector state(2*size);
-    CVector state_dot(2*size);
-
-    state = SetState();
-    EvaluateStateDerivative(0.0, state, state_dot, structure);
-
-    if(structure->GetnDof() == 1){
-      qddot[0] = state_dot[1];
-    }
-    else if (structure->GetnDof() == 2){
-      qddot[0] = state_dot[2];
-      qddot[1] = state_dot[3];
-    }
-    else{
-
-    }
-
-  }
 }
 
-CVector RK4Solver::SetState(){
+RK4Solver::~RK4Solver() {}
 
-  CVector state(2*size);
+void RK4Solver::Iterate(double &t0, double &tf, Structure *structure)
+{
 
-  if(size == 1){
-    state[0] = q[0];
-    state[1] = qdot[0];
-  }
-  else if (size == 2){
-    state[0] = q[0];
-    state[1] = q[1];
-    state[2] = qdot[0];
-    state[3] = qdot[1];
-  }
-  else{
+    double h = tf - t0;
+    lastTime = t0;
+    currentTime = tf;
 
-  }
+    CVector k1(2 * size);
+    CVector k2(2 * size);
+    CVector k3(2 * size);
+    CVector k4(2 * size);
 
-  return state;
+    CVector state0(2 * size);
+    CVector statef(2 * size);
+    CVector statef_dot(2 * size);
+    state0 = SetState_n();
 
+    CVector TEMP(2 * size);
+
+    EvaluateStateDerivative(lastTime, state0, k1, structure);
+    TEMP = state0 + (k1 * (h / 2.0));
+    EvaluateStateDerivative(lastTime + h / 2.0, TEMP, k2, structure);
+    TEMP = state0 + (k2 * (h / 2.0));
+    EvaluateStateDerivative(lastTime + h / 2.0, TEMP, k3, structure);
+    TEMP = state0 + (k3 * h);
+    EvaluateStateDerivative(lastTime + h, TEMP, k4, structure);
+
+    statef = state0 + ((k1 + k2 * 2.0 + k3 * 2.0 + k4) * (h / 6.0));
+
+    EvaluateStateDerivative(lastTime + h, statef, statef_dot, structure);
+
+    if (structure->GetnDof() == 1)
+    {
+        q[0] = statef[0];
+        qdot[0] = statef[1];
+        qddot[0] = statef_dot[1];
+    }
+    else if (structure->GetnDof() == 2)
+    {
+        q[0] = statef[0];
+        q[1] = statef[1];
+        qdot[0] = statef[2];
+        qdot[1] = statef[3];
+        qddot[0] = statef_dot[2];
+        qddot[1] = statef_dot[3];
+    }
 }
 
-CVector RK4Solver::SetState_n(){
+void RK4Solver::EvaluateStateDerivative(double tCurrent, CVector &state, CVector &stateDerivative, Structure *structure)
+{
 
-  CVector state(2*size);
+    CVector stateLoads(size, 0.0);
+    interpLoads(tCurrent, stateLoads);
 
-  if(size == 1){
-    state[0] = q_n[0];
-    state[1] = qdot_n[0];
-  }
-  else if (size == 2){
-    state[0] = q_n[0];
-    state[1] = q_n[1];
-    state[2] = qdot_n[0];
-    state[3] = qdot_n[1];
-  }
-  else{
+    CMatrix MM(size, size, 0.0);
+    CMatrix CC(size, size, 0.0);
+    CMatrix KK(size, size, 0.0);
+    CVector NonLinTerm(size, 0.0);
+    CVector RHS(size, 0.0);
 
-  }
+    CVector q_current(size, 0.0);
+    CVector qdot_current(size, 0.0);
+    CVector qddot_current(size, 0.0);
 
-  return state;
+    if (structure->GetnDof() == 1)
+    {
+        MM.SetElm(1, 1, structure->Get_m());
+        KK.SetElm(1, 1, structure->Get_Kh());
+        CC.SetElm(1, 1, structure->Get_Ch());
+        q_current[0] = state[0];
+        qdot_current[0] = state[1];
+        stateDerivative[0] = state[1];
+    }
+    else if (structure->GetnDof() == 2)
+    {
+        double cos_a;
+        if (linear)
+        {
+            cos_a = 1.0;
+        }
+        else
+        {
+            cos_a = cos(state[1]);
+            NonLinTerm[0] = (structure->Get_S()) * sin(state[1]) * pow(state[3], 2);
+        }
+        MM.SetElm(1, 1, structure->Get_m());
+        MM.SetElm(1, 2, (structure->Get_S()) * cos_a);
+        MM.SetElm(2, 1, (structure->Get_S()) * cos_a);
+        MM.SetElm(2, 2, structure->Get_If());
+        CC.SetElm(1, 1, structure->Get_Ch());
+        CC.SetElm(2, 2, structure->Get_Ca());
+        KK.SetElm(1, 1, structure->Get_Kh());
+        KK.SetElm(2, 2, structure->Get_Ka());
+        q_current[0] = state[0];
+        q_current[1] = state[1];
+        qdot_current[0] = state[2];
+        qdot_current[1] = state[3];
+        stateDerivative[0] = state[2];
+        stateDerivative[1] = state[3];
+    }
+
+    RHS += stateLoads;
+    RHS -= MatVecProd(CC, qdot_current);
+    RHS -= MatVecProd(KK, q_current);
+    RHS += NonLinTerm;
+
+    SolveSys(MM, RHS);
+    qddot_current = RHS;
+
+    if (structure->GetnDof() == 1)
+    {
+        stateDerivative[1] = qddot_current[0];
+    }
+    else if (structure->GetnDof() == 2)
+    {
+        stateDerivative[2] = qddot_current[0];
+        stateDerivative[3] = qddot_current[1];
+    }
 }
 
-/*CLASS STATIC SOLVER*/
+void RK4Solver::interpLoads(double &tCurrent, CVector &val_loads)
+{
+
+    if (lastTime != currentTime)
+    {
+        val_loads[0] = (Loads[0] - Loads_n[0]) / (currentTime - lastTime) * (tCurrent - lastTime) + Loads_n[0];
+        if (size == 2)
+            val_loads[1] = (Loads[1] - Loads_n[1]) / (currentTime - lastTime) * (tCurrent - lastTime) + Loads_n[1];
+    }
+    else
+    {
+        val_loads[0] = Loads[0];
+        if (size == 2)
+            val_loads[1] = Loads[1];
+    }
+}
+
+void RK4Solver::SetInitialState(Config *config, Structure *structure)
+{
+    if (config->GetRestartSol() == "YES")
+    {
+    }
+    else
+    {
+        std::cout << "Setting basic initial conditions for RK4" << std::endl;
+        q.Reset();
+        q_n.Reset();
+        std::cout << "Read initial configuration" << std::endl;
+        q[0] = config->GetInitialDisp();
+        if (structure->GetnDof() == 2)
+            q[1] = config->GetInitialAngle();
+        std::cout << "Initial plunging displacement : " << q[0] << std::endl;
+        std::cout << "Initial pitching displacement : " << q[1] << std::endl;
+        qdot.Reset();
+
+        lastTime = 0.0;
+        currentTime = 0.0;
+
+        qddot.Reset();
+        CVector state(2 * size);
+        CVector state_dot(2 * size);
+
+        state = SetState();
+        EvaluateStateDerivative(0.0, state, state_dot, structure);
+
+        if (structure->GetnDof() == 1)
+        {
+            qddot[0] = state_dot[1];
+        }
+        else if (structure->GetnDof() == 2)
+        {
+            qddot[0] = state_dot[2];
+            qddot[1] = state_dot[3];
+        }
+    }
+}
+
+CVector RK4Solver::SetState()
+{
+    CVector state(2 * size);
+
+    if (size == 1)
+    {
+        state[0] = q[0];
+        state[1] = qdot[0];
+    }
+    else if (size == 2)
+    {
+        state[0] = q[0];
+        state[1] = q[1];
+        state[2] = qdot[0];
+        state[3] = qdot[1];
+    }
+    else
+    {
+    }
+
+    return state;
+}
+
+CVector RK4Solver::SetState_n()
+{
+    CVector state(2 * size);
+
+    if (size == 1)
+    {
+        state[0] = q_n[0];
+        state[1] = qdot_n[0];
+    }
+    else if (size == 2)
+    {
+        state[0] = q_n[0];
+        state[1] = q_n[1];
+        state[2] = qdot_n[0];
+        state[3] = qdot_n[1];
+    }
+    else
+    {
+    }
+
+    return state;
+}
+
+// CLASS STATIC SOLVER
 StaticSolver::StaticSolver(unsigned nDof, bool bool_linear) : Solver(nDof, bool_linear)
 {
-  _nDof = nDof;
-  KK.Initialize(_nDof, _nDof, 0.0);
+    _nDof = nDof;
+    KK.Initialize(_nDof, _nDof, 0.0);
 }
 
 StaticSolver::~StaticSolver()
 {
-  std::cout << "NativeSolid::~StaticSolver()" << std::endl;
+    std::cout << "NativeSolid::~StaticSolver()" << std::endl;
 }
 
-void StaticSolver::SetInitialState(Config *config, Structure *structure){
-  // Reset displacement, velocity and acceleration
-  if (config->GetRestartSol() == "YES"){
-  }
-  else{
-    cout << "Setting basic initial conditions for Static" << endl;
-    q.Reset();
-    q_n.Reset();
-    cout << "Read initial configuration" << endl;
-    q[0] = config->GetInitialDisp();
-    if(_nDof == 2) q[1] = config->GetInitialAngle();
-    cout << "Initial plunging displacement : " << q[0] << endl;
-    cout << "Initial pitching displacement : " << q[1] << endl;
-    qdot.Reset();
-    qddot.Reset();
-  }
-  // Fill stiffness matrix
-  if(_nDof == 1)
-    KK.SetElm(1,1,structure->Get_Kh());
-  else if(_nDof == 2) {
-    KK.SetElm(1,1,structure->Get_Kh());
-    KK.SetElm(2,2,structure->Get_Ka());
-  }
-  else {
-    cerr << "Error in NativeSolid::StaticSolver: Number of degrees of freedom is out of range. nDof = " << _nDof << endl;
-    throw(-1);
-  }
-}
-
-void StaticSolver::Iterate(double &t0, double &tf, Structure* structure)
+void StaticSolver::SetInitialState(Config *config, Structure *structure)
 {
-  // Solve KK*q = Loads
-  q_n = q; // save previous state (used to compute rotation in NativeSolidSolver::computeInterfacePosVel)
-  CVector RHS(_nDof, 0.);
-  RHS += Loads;
-  SolveSys(KK, RHS);
-  q = RHS;
+    // Reset displacement, velocity and acceleration
+    if (config->GetRestartSol() == "YES")
+    {
+    }
+    else
+    {
+        std::cout << "Setting basic initial conditions for Static" << std::endl;
+        q.Reset();
+        q_n.Reset();
+        std::cout << "Read initial configuration" << std::endl;
+        q[0] = config->GetInitialDisp();
+        if (_nDof == 2)
+            q[1] = config->GetInitialAngle();
+        std::cout << "Initial plunging displacement : " << q[0] << std::endl;
+        std::cout << "Initial pitching displacement : " << q[1] << std::endl;
+        qdot.Reset();
+        qddot.Reset();
+    }
+    // Fill stiffness matrix
+    if (_nDof == 1)
+        KK.SetElm(1, 1, structure->Get_Kh());
+    else if (_nDof == 2)
+    {
+        KK.SetElm(1, 1, structure->Get_Kh());
+        KK.SetElm(2, 2, structure->Get_Ka());
+    }
+    else
+    {
+        std::cerr << "Error in NativeSolid::StaticSolver: Number of degrees of freedom is out of range. nDof = " << _nDof << std::endl;
+        throw(-1);
+    }
+}
+
+void StaticSolver::Iterate(double &t0, double &tf, Structure *structure)
+{
+    // Solve KK*q = Loads
+    q_n = q; // save previous state (used to compute rotation in NativeSolidSolver::computeInterfacePosVel)
+    CVector RHS(_nDof, 0.);
+    RHS += Loads;
+    SolveSys(KK, RHS);
+    q = RHS;
 }
 
 /*CLASS HARMONICSOLVER*/
-HarmonicSolver::HarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_linear) : Solver((2*nHarmonic+1)*nDof, bool_linear) {
-  _nHarmonic = nHarmonic;
-  _nOmega = 2*_nHarmonic+1;
-  _nDof = nDof;
-  d.Initialize(_nOmega, _nOmega, 0.0);
-  d2.Initialize(_nOmega, _nOmega, 0.0);
-  AA.Initialize(_nOmega, _nOmega, 0.0);
-  deltaOmega = 0.;
-  amplitude = 0.;
+HarmonicSolver::HarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_linear) : Solver((2 * nHarmonic + 1) * nDof, bool_linear)
+{
+    _nHarmonic = nHarmonic;
+    _nOmega = 2 * _nHarmonic + 1;
+    _nDof = nDof;
+    d.Initialize(_nOmega, _nOmega, 0.0);
+    d2.Initialize(_nOmega, _nOmega, 0.0);
+    AA.Initialize(_nOmega, _nOmega, 0.0);
+    deltaOmega = 0.;
+    amplitude = 0.;
 }
 
 HarmonicSolver::~HarmonicSolver() {}
 
-void HarmonicSolver::SetInitialState(Config *config, Structure *structure){
-  double omegaN2, damping;
-  unsigned short nHarmonics;
+void HarmonicSolver::SetInitialState(Config *config, Structure *structure)
+{
+    double omegaN2, damping;
+    unsigned short nHarmonics;
 
-  if(config->GetRestartSol() == "YES"){
-    string InputFileName = config->GetRestartFile();
-    string text_line;
-    string token, tempString;
-    size_t pos;
-    string delimiter = "\t";
-    ifstream InputFile;
-    cout << "Reading restart file: " <<  InputFileName << endl;
-    InputFile.open(InputFileName.c_str(), ios::in);
-    double buffer[(3*structure->GetnDof())+1];
-    int kk = 0;
-    int jj;
-    while (getline(InputFile,text_line) && kk < _nOmega+1){
-      tempString = text_line;
-      jj = 0;
-      if (kk >= 1){
-        while ((pos = tempString.find(delimiter)) != string::npos){
-          token = tempString.substr(0,pos);
-          tempString.erase(0,pos+delimiter.length());
-          buffer[jj] = atof(token.c_str());
-          jj += 1;
-        }
-        buffer[jj] = atof(tempString.c_str());
+    if (config->GetRestartSol() == "YES")
+    {
+        std::string InputFileName = config->GetRestartFile();
+        std::string text_line;
+        std::string token, tempString;
+        size_t pos;
+        std::string delimiter = "\t";
+        std::ifstream InputFile;
+        std::cout << "Reading restart file: " << InputFileName << std::endl;
+        InputFile.open(InputFileName.c_str(), std::ios::in);
+        double buffer[(3 * structure->GetnDof()) + 1];
+        int kk = 0;
+        int jj;
+        while (getline(InputFile, text_line) && kk < _nOmega + 1)
+        {
+            tempString = text_line;
+            jj = 0;
+            if (kk >= 1)
+            {
+                while ((pos = tempString.find(delimiter)) != std::string::npos)
+                {
+                    token = tempString.substr(0, pos);
+                    tempString.erase(0, pos + delimiter.length());
+                    buffer[jj] = atof(token.c_str());
+                    jj += 1;
+                }
+                buffer[jj] = atof(tempString.c_str());
 
-        if(structure->GetnDof() == 1){
-          q[kk-1]     = buffer[1];
-          qdot[kk-1]  = buffer[2];
-          qddot[kk-1] = buffer[3];
+                if (structure->GetnDof() == 1)
+                {
+                    q[kk - 1] = buffer[1];
+                    qdot[kk - 1] = buffer[2];
+                    qddot[kk - 1] = buffer[3];
+                }
+                else if (structure->GetnDof() == 2)
+                {
+                    q[kk - 1] = buffer[1];
+                    q[kk - 1 + _nOmega] = buffer[2];
+                    qdot[kk - 1] = buffer[3];
+                    qdot[kk - 1 + _nOmega] = buffer[4];
+                    qddot[kk - 1] = buffer[5];
+                    qddot[kk - 1 + _nOmega] = buffer[6];
+                }
+                q.print();
+                qdot.print();
+                qddot.print();
+            }
+            kk += 1;
         }
-        else if (structure->GetnDof() == 2){
-          q[kk-1]             = buffer[1];
-          q[kk-1+_nOmega]     = buffer[2];
-          qdot[kk-1]          = buffer[3];
-          qdot[kk-1+_nOmega]  = buffer[4];
-          qddot[kk-1]         = buffer[5];
-          qddot[kk-1+_nOmega] = buffer[6];
-        }
-        q.print();
-        qdot.print();
-        qddot.print();
-      }
-      kk += 1;
+        InputFile.close();
     }
-    InputFile.close();
-  }
 
-
-  E.Initialize(_nOmega, _nOmega, 0.0);
-  Em1.Initialize(_nOmega, _nOmega, 1.0);
-  omega = config->GetOmega();
-  omega_n = config->GetOmega();
-  omegaN2 = config->GetSpringStiffness()/config->GetSpringMass(); // Modal natural frequency squared
-  damping = config->GetSpringDamping()/config->GetSpringMass();
-  nHarmonics = config->GetNumberHarmonics();
-  cout << "Damping: " << damping << " Omega^2: " << omegaN2 << " nH: " << nHarmonics << endl;
-  SetHBMatrices();
-  pitchObjFun = (config->GetObjFunction() == "PITCH_AMPLITUDE");
-  if (config->GetFixedDof() == "PLUNGE")
-  {
-    fixedDof = 0;
-  }
-  else if (config->GetFixedDof() == "PITCH")
-  {
-    fixedDof = 1;
-  }
-  else
-  {
-    fixedDof = 127;
-  }
-  
+    E.Initialize(_nOmega, _nOmega, 0.0);
+    Em1.Initialize(_nOmega, _nOmega, 1.0);
+    omega = config->GetOmega();
+    omega_n = config->GetOmega();
+    omegaN2 = config->GetSpringStiffness() / config->GetSpringMass(); // Modal natural frequency squared
+    damping = config->GetSpringDamping() / config->GetSpringMass();
+    nHarmonics = config->GetNumberHarmonics();
+    std::cout << "Damping: " << damping << " Omega^2: " << omegaN2 << " nH: " << nHarmonics << std::endl;
+    SetHBMatrices();
+    pitchObjFun = (config->GetObjFunction() == "PITCH_AMPLITUDE");
+    if (config->GetFixedDof() == "PLUNGE")
+    {
+        fixedDof = 0;
+    }
+    else if (config->GetFixedDof() == "PITCH")
+    {
+        fixedDof = 1;
+    }
+    else
+    {
+        fixedDof = 127;
+    }
 }
 
-void HarmonicSolver::SetHBMatrices(){
-  E.Reset();
-  for (unsigned short i = 1; i <= _nOmega; i++)
-  {
-    E.SetElm(i,i,1.0);
-  }
-  
-
-  for (unsigned short i = 1; i <= _nHarmonic; i++){
-    AA.SetElm(2*i+1, 2*i, -omega*i);
-    AA.SetElm(2*i, 2*i+1, omega*i);
-    for (unsigned short j = 0; j < _nOmega; j++)
+void HarmonicSolver::SetHBMatrices()
+{
+    E.Reset();
+    for (unsigned short i = 1; i <= _nOmega; i++)
     {
-      Em1.SetElm(j+1, 2*i, cos(2*M_PI*j/_nOmega*i));
-      Em1.SetElm(j+1, 2*i+1, sin(2*M_PI*j/_nOmega*i));
+        E.SetElm(i, i, 1.0);
     }
-    
-  }
-  SolveSys(Em1, E);
-  d = MatMatProd(AA, E);
-  d = MatMatProd(Em1, d);
-  d2 = MatMatProd(d, d);
+
+    for (unsigned short i = 1; i <= _nHarmonic; i++)
+    {
+        AA.SetElm(2 * i + 1, 2 * i, -omega * i);
+        AA.SetElm(2 * i, 2 * i + 1, omega * i);
+        for (unsigned short j = 0; j < _nOmega; j++)
+        {
+            Em1.SetElm(j + 1, 2 * i, cos(2 * M_PI * j / _nOmega * i));
+            Em1.SetElm(j + 1, 2 * i + 1, sin(2 * M_PI * j / _nOmega * i));
+        }
+    }
+    SolveSys(Em1, E);
+    d = MatMatProd(AA, E);
+    d = MatMatProd(Em1, d);
+    d2 = MatMatProd(d, d);
 }
 
-void HarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
-  unsigned int _nTotal = _nDof*_nOmega;
-  unsigned int fDoF = 2+fixedDof*_nOmega; // DoF to be fixed to 0
-  unsigned int counter;
+void HarmonicSolver::Iterate(double &t0, double &tf, Structure *structure)
+{
+    unsigned int _nTotal = _nDof * _nOmega;
+    unsigned int fDoF = 2 + fixedDof * _nOmega; // DoF to be fixed to 0
+    unsigned int counter;
 
-  CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain
-  CVector qdot_temp(_nOmega, 0.0);
-  CVector qddot_temp(_nOmega, 0.0);
-  CVector f_temp(_nOmega, 0.0);
-  CVector temp_hold(_nOmega, 0.0); // Temporary hold for the frequency domain things
+    CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain
+    CVector qdot_temp(_nOmega, 0.0);
+    CVector qddot_temp(_nOmega, 0.0);
+    CVector f_temp(_nOmega, 0.0);
+    CVector temp_hold(_nOmega, 0.0); // Temporary hold for the frequency domain things
 
-  CVector x_temp(2*_nTotal, 0.0); // Old & new? solution of the state-space problem in the frequency domain
-  CVector RHS(2*_nTotal, 0.0); // Load vector
-  CVector Res(2*_nTotal, 0.0); // Residual vector
-  CMatrix MM(2*_nTotal, 2*_nTotal, 0.0);
-  CMatrix KK(2*_nTotal, 2*_nTotal, 0.0);
-  CMatrix AAA(2*_nTotal, 2*_nTotal, 0.0); // Frequency derivative matrix
-  CMatrix LHS(2*_nTotal, 2*_nTotal, 0.0);
-  CMatrix dRes(2*_nTotal, 2*_nTotal, 0.0);
-  CMatrix Aux(2*_nTotal, 2*_nTotal, 0.0);
-  CVector dResdw(2*_nTotal, 0.0);
+    CVector x_temp(2 * _nTotal, 0.0); // Old & new? solution of the state-space problem in the frequency domain
+    CVector RHS(2 * _nTotal, 0.0);    // Load vector
+    CVector Res(2 * _nTotal, 0.0);    // Residual vector
+    CMatrix MM(2 * _nTotal, 2 * _nTotal, 0.0);
+    CMatrix KK(2 * _nTotal, 2 * _nTotal, 0.0);
+    CMatrix AAA(2 * _nTotal, 2 * _nTotal, 0.0); // Frequency derivative matrix
+    CMatrix LHS(2 * _nTotal, 2 * _nTotal, 0.0);
+    CMatrix dRes(2 * _nTotal, 2 * _nTotal, 0.0);
+    CMatrix Aux(2 * _nTotal, 2 * _nTotal, 0.0);
+    CVector dResdw(2 * _nTotal, 0.0);
 
-  for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
-  {
-    KK.SetElm(_nTotal+iOmega+1, iOmega+1, structure->Get_Kh());
-    KK.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1, structure->Get_Ch());
-    KK.SetElm(iOmega+1, _nTotal+iOmega+1, -1.);
-
-    MM.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1, structure->Get_m());
-    MM.SetElm(iOmega+1, iOmega+1, 1.);
-
-    if (_nDof == 2)
+    for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
     {
-      KK.SetElm(_nTotal+iOmega+1+_nOmega, iOmega+1+_nOmega, structure->Get_Ka());
-      KK.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, structure->Get_Ca());
-      KK.SetElm(iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, -1.);
+        KK.SetElm(_nTotal + iOmega + 1, iOmega + 1, structure->Get_Kh());
+        KK.SetElm(_nTotal + iOmega + 1, _nTotal + iOmega + 1, structure->Get_Ch());
+        KK.SetElm(iOmega + 1, _nTotal + iOmega + 1, -1.);
 
-      MM.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, structure->Get_If());
-      MM.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1+_nOmega, structure->Get_S());
-      MM.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1, structure->Get_S());
-      MM.SetElm(iOmega+1+_nOmega, iOmega+1+_nOmega, 1.);
+        MM.SetElm(_nTotal + iOmega + 1, _nTotal + iOmega + 1, structure->Get_m());
+        MM.SetElm(iOmega + 1, iOmega + 1, 1.);
+
+        if (_nDof == 2)
+        {
+            KK.SetElm(_nTotal + iOmega + 1 + _nOmega, iOmega + 1 + _nOmega, structure->Get_Ka());
+            KK.SetElm(_nTotal + iOmega + 1 + _nOmega, _nTotal + iOmega + 1 + _nOmega, structure->Get_Ca());
+            KK.SetElm(iOmega + 1 + _nOmega, _nTotal + iOmega + 1 + _nOmega, -1.);
+
+            MM.SetElm(_nTotal + iOmega + 1 + _nOmega, _nTotal + iOmega + 1 + _nOmega, structure->Get_If());
+            MM.SetElm(_nTotal + iOmega + 1, _nTotal + iOmega + 1 + _nOmega, structure->Get_S());
+            MM.SetElm(_nTotal + iOmega + 1 + _nOmega, _nTotal + iOmega + 1, structure->Get_S());
+            MM.SetElm(iOmega + 1 + _nOmega, iOmega + 1 + _nOmega, 1.);
+        }
     }
-  }
 
-  for (int iHarmonic = 1; iHarmonic <= _nHarmonic; iHarmonic++){ // It... is signed down there. Option: iHarmonic*-1.0. Not that anybody will use that many harmonics!
-    AAA.SetElm(2*iHarmonic+1, 2*iHarmonic, -iHarmonic*1.0);
-    AAA.SetElm(2*iHarmonic, 2*iHarmonic+1, iHarmonic*1.0);
-    // For the dot ones
-    AAA.SetElm(2*iHarmonic+1+_nTotal, 2*iHarmonic+_nTotal, -iHarmonic*1.0);
-    AAA.SetElm(2*iHarmonic+_nTotal, 2*iHarmonic+1+_nTotal, iHarmonic*1.0);
-    if (_nDof == 2)
-    {
-      AAA.SetElm(2*iHarmonic+1+_nOmega, 2*iHarmonic+_nOmega, -iHarmonic*1.0);
-      AAA.SetElm(2*iHarmonic+_nOmega, 2*iHarmonic+1+_nOmega, iHarmonic*1.0);
-      // For the dot ones
-      AAA.SetElm(2*iHarmonic+1+_nTotal+_nOmega, 2*iHarmonic+_nTotal+_nOmega, -iHarmonic*1.0);
-      AAA.SetElm(2*iHarmonic+_nTotal+_nOmega, 2*iHarmonic+1+_nTotal+_nOmega, iHarmonic*1.0);
+    for (int iHarmonic = 1; iHarmonic <= _nHarmonic; iHarmonic++)
+    { // It... is signed down there. Option: iHarmonic*-1.0. Not that anybody will use that many harmonics!
+        AAA.SetElm(2 * iHarmonic + 1, 2 * iHarmonic, -iHarmonic * 1.0);
+        AAA.SetElm(2 * iHarmonic, 2 * iHarmonic + 1, iHarmonic * 1.0);
+        // For the dot ones
+        AAA.SetElm(2 * iHarmonic + 1 + _nTotal, 2 * iHarmonic + _nTotal, -iHarmonic * 1.0);
+        AAA.SetElm(2 * iHarmonic + _nTotal, 2 * iHarmonic + 1 + _nTotal, iHarmonic * 1.0);
+        if (_nDof == 2)
+        {
+            AAA.SetElm(2 * iHarmonic + 1 + _nOmega, 2 * iHarmonic + _nOmega, -iHarmonic * 1.0);
+            AAA.SetElm(2 * iHarmonic + _nOmega, 2 * iHarmonic + 1 + _nOmega, iHarmonic * 1.0);
+            // For the dot ones
+            AAA.SetElm(2 * iHarmonic + 1 + _nTotal + _nOmega, 2 * iHarmonic + _nTotal + _nOmega, -iHarmonic * 1.0);
+            AAA.SetElm(2 * iHarmonic + _nTotal + _nOmega, 2 * iHarmonic + 1 + _nTotal + _nOmega, iHarmonic * 1.0);
+        }
     }
-  }
 
-  for (unsigned int iDof = 0; iDof < _nDof; iDof++)
-  {
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    for (unsigned int iDof = 0; iDof < _nDof; iDof++)
     {
-      q_temp[jOmega] = q[jOmega+iDof*_nOmega];
-      qdot_temp[jOmega] = qdot[jOmega+iDof*_nOmega];
-      f_temp[jOmega] = Loads[jOmega+iDof*_nOmega];
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            q_temp[jOmega] = q[jOmega + iDof * _nOmega];
+            qdot_temp[jOmega] = qdot[jOmega + iDof * _nOmega];
+            f_temp[jOmega] = Loads[jOmega + iDof * _nOmega];
+        }
+        temp_hold = MatVecProd(E, q_temp);
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            x_temp[jOmega + iDof * _nOmega] = temp_hold[jOmega];
+        }
+        temp_hold = MatVecProd(AA, temp_hold);
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            x_temp[jOmega + iDof * _nOmega + _nTotal] = temp_hold[jOmega];
+        }
+        temp_hold = MatVecProd(E, f_temp);
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            RHS[jOmega + iDof * _nOmega + _nTotal] = temp_hold[jOmega];
+        }
     }
-    temp_hold = MatVecProd(E, q_temp);
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      x_temp[jOmega+iDof*_nOmega] = temp_hold[jOmega];
-    }
-    temp_hold = MatVecProd(AA, temp_hold);
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      x_temp[jOmega+iDof*_nOmega+_nTotal] = temp_hold[jOmega];
-    }
-    temp_hold = MatVecProd(E, f_temp);
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      RHS[jOmega+iDof*_nOmega+_nTotal] = temp_hold[jOmega];
-    }
-  }
-  
-  Aux = MatMatProd(MM, AAA);
-  LHS = omega*Aux;
-  LHS += KK;
 
-  Res -= MatVecProd(LHS, x_temp);
-  Res += RHS;
-  dResdw = MatVecProd(Aux, x_temp);
+    Aux = MatMatProd(MM, AAA);
+    LHS = omega * Aux;
+    LHS += KK;
 
-  counter = 0;
-  for (unsigned int i = 0; i < 2*_nTotal; i++)
-  {
-    if (fDoF < 2*_nTotal) // Only add frequency dependence if the dof to be fixed makes sense
-    {
-      dRes.SetElm(i+1, 2*_nTotal, dResdw[i]);
-    }
-    if (i == fDoF)
-    {
-      continue;
-    }
-    for (unsigned int j = 0; j < 2*_nTotal; j++)
-    {
-      dRes.SetElm(j+1, counter+1, LHS.GetElm(j+1, i+1));
-    }
-    counter++;
-  }
+    Res -= MatVecProd(LHS, x_temp);
+    Res += RHS;
+    dResdw = MatVecProd(Aux, x_temp);
 
-  SolveSys(dRes, Res);
-
-  counter = 0;
-  for (unsigned int iDof = 0; iDof < _nDof; iDof++)
-  {
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+    counter = 0;
+    for (unsigned int i = 0; i < 2 * _nTotal; i++)
     {
-      if (jOmega+iDof*_nOmega != fDoF)
-      {
-        temp_hold[jOmega] = x_temp[jOmega+iDof*_nOmega]+Res[counter];
+        if (fDoF < 2 * _nTotal) // Only add frequency dependence if the dof to be fixed makes sense
+        {
+            dRes.SetElm(i + 1, 2 * _nTotal, dResdw[i]);
+        }
+        if (i == fDoF)
+        {
+            continue;
+        }
+        for (unsigned int j = 0; j < 2 * _nTotal; j++)
+        {
+            dRes.SetElm(j + 1, counter + 1, LHS.GetElm(j + 1, i + 1));
+        }
         counter++;
-      }
-      else
-      {
-        temp_hold[jOmega] = 0.;
-      }
-    }
-    if (iDof == 1)
-    {
-      amplitude = temp_hold[1]*temp_hold[1];
-    }
-    q_temp = MatVecProd(Em1, temp_hold);
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      q[jOmega+iDof*_nOmega]      = q_temp[jOmega];
     }
 
-  }
-  deltaOmega = 0.;
-  if (fixedDof < _nDof)
-  {
-    deltaOmega = Res[2*_nTotal-1];
-  }
-  for (unsigned int iDof = 0; iDof < _nDof; iDof++)
-  {
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      temp_hold[jOmega] = x_temp[jOmega+iDof*_nOmega+_nTotal]+Res[counter];
-      counter++;
-      q_temp[jOmega] = q[jOmega+iDof*_nOmega];
-    }
-    qdot_temp = MatVecProd(d, q_temp)*(omega+deltaOmega)/omega;
-    qddot_temp = MatVecProd(d, qdot_temp)*(omega+deltaOmega)/omega;
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      qdot[jOmega+iDof*_nOmega]   = qdot_temp[jOmega];
-      qddot[jOmega+iDof*_nOmega]  = qddot_temp[jOmega];
-    }
-  }
+    SolveSys(dRes, Res);
 
-  omega_n = omega;
+    counter = 0;
+    for (unsigned int iDof = 0; iDof < _nDof; iDof++)
+    {
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            if (jOmega + iDof * _nOmega != fDoF)
+            {
+                temp_hold[jOmega] = x_temp[jOmega + iDof * _nOmega] + Res[counter];
+                counter++;
+            }
+            else
+            {
+                temp_hold[jOmega] = 0.;
+            }
+        }
+        if (iDof == 1)
+        {
+            amplitude = temp_hold[1] * temp_hold[1];
+        }
+        q_temp = MatVecProd(Em1, temp_hold);
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            q[jOmega + iDof * _nOmega] = q_temp[jOmega];
+        }
+    }
+    deltaOmega = 0.;
+    if (fixedDof < _nDof)
+    {
+        deltaOmega = Res[2 * _nTotal - 1];
+    }
+    for (unsigned int iDof = 0; iDof < _nDof; iDof++)
+    {
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            temp_hold[jOmega] = x_temp[jOmega + iDof * _nOmega + _nTotal] + Res[counter];
+            counter++;
+            q_temp[jOmega] = q[jOmega + iDof * _nOmega];
+        }
+        qdot_temp = MatVecProd(d, q_temp) * (omega + deltaOmega) / omega;
+        qddot_temp = MatVecProd(d, qdot_temp) * (omega + deltaOmega) / omega;
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            qdot[jOmega + iDof * _nOmega] = qdot_temp[jOmega];
+            qddot[jOmega + iDof * _nOmega] = qddot_temp[jOmega];
+        }
+    }
+
+    omega_n = omega;
 }
 
-void HarmonicSolver::SetStates(unsigned int iInstance, unsigned int DoF, double displacement){
-  CVector tempvel, tempacc, temppos;
-  temppos.Initialize(_nOmega, 0.0);
-  tempvel.Initialize(_nOmega, 0.0);
-  tempacc.Initialize(_nOmega, 0.0);
-  q[iInstance+(DoF-1)*_nOmega] = displacement;
+void HarmonicSolver::SetStates(unsigned int iInstance, unsigned int DoF, double displacement)
+{
+    CVector tempvel, tempacc, temppos;
+    temppos.Initialize(_nOmega, 0.0);
+    tempvel.Initialize(_nOmega, 0.0);
+    tempacc.Initialize(_nOmega, 0.0);
+    q[iInstance + (DoF - 1) * _nOmega] = displacement;
 }
 
 /*CLASS ADJOINTSTATICSOLVER*/
 AdjointStaticSolver::AdjointStaticSolver(unsigned nDof, bool bool_linear) : StaticSolver(nDof, bool_linear)
 {
-  _nDof = nDof;
-  qDerivative.Initialize(_nDof, 0.0);
-  AdjointLoad.Initialize(_nDof, 0.);
+    _nDof = nDof;
+    qDerivative.Initialize(_nDof, 0.0);
+    AdjointLoad.Initialize(_nDof, 0.);
 }
 
 AdjointStaticSolver::~AdjointStaticSolver()
 {
-  std::cout << "NativeSolid::~AdjointStaticSolver()" << std::endl;
+    std::cout << "NativeSolid::~AdjointStaticSolver()" << std::endl;
 }
 
-void AdjointStaticSolver::Iterate(double &t0, double &tf, Structure* structure)
+void AdjointStaticSolver::Iterate(double &t0, double &tf, Structure *structure)
 {
-  // Solve KK*AdjointLoad = qDerivative
-  CVector RHS(_nDof, 0.);
-  
-  RHS += qDerivative;
-  SolveSys(KK, RHS); // Adjoint means transposed matrix but stiffness is diagonal
-  AdjointLoad = RHS;
+    // Solve KK*AdjointLoad = qDerivative
+    CVector RHS(_nDof, 0.);
 
-  for (unsigned int i = 0; i < _nDof; i++)
-  {
-    for (unsigned int j = 0; j < _nDof; j++){
-      cout << "Adjoint K [" << i << j << "]: " << KK.GetElm(i+1, j+1) << endl;
+    RHS += qDerivative;
+    SolveSys(KK, RHS); // Adjoint means transposed matrix but stiffness is diagonal
+    AdjointLoad = RHS;
+
+    for (unsigned int i = 0; i < _nDof; i++)
+    {
+        for (unsigned int j = 0; j < _nDof; j++)
+        {
+            std::cout << "Adjoint K [" << i << j << "]: " << KK.GetElm(i + 1, j + 1) << std::endl;
+        }
     }
-  }
 
-  for (unsigned int i = 0; i < _nDof; i++)
-  {
-    cout << "Adjoint load [" << i << "]: " << AdjointLoad[i] << endl;
-  }
-  
+    for (unsigned int i = 0; i < _nDof; i++)
+    {
+        std::cout << "Adjoint load [" << i << "]: " << AdjointLoad[i] << std::endl;
+    }
 }
 
-double AdjointStaticSolver::GetStiffnessDerivative(unsigned int dof){
-  double dJdk = 0.;
-  return dJdk;
+double AdjointStaticSolver::GetStiffnessDerivative(unsigned int dof)
+{
+    double dJdk = 0.;
+    return dJdk;
 }
 
 /*CLASS ADJOINTHARMONICSOLVER*/
 AdjointHarmonicSolver::AdjointHarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_linear) : HarmonicSolver(nDof, nHarmonic, bool_linear)
 {
-  _nDof = nDof;
-  _nOmega = 2*nHarmonic+1;
-  AdjointOmega = 0.0;
-  cout << "nHarmonic: " << nHarmonic << endl;
-  qDerivative.Initialize(2*_nDof*_nOmega, 0.0);
-  AdjointLoad.Initialize(_nDof*_nOmega, 0.);
-  LoadGradient.Initialize(_nOmega, _nOmega, 0.);
-  ET.Initialize(_nOmega, _nOmega, 0.0);
-  Em1T.Initialize(_nOmega, _nOmega, 1.0);
+    _nDof = nDof;
+    _nOmega = 2 * nHarmonic + 1;
+    AdjointOmega = 0.0;
+    std::cout << "nHarmonic: " << nHarmonic << std::endl;
+    qDerivative.Initialize(2 * _nDof * _nOmega, 0.0);
+    AdjointLoad.Initialize(_nDof * _nOmega, 0.);
+    LoadGradient.Initialize(_nOmega, _nOmega, 0.);
+    ET.Initialize(_nOmega, _nOmega, 0.0);
+    Em1T.Initialize(_nOmega, _nOmega, 1.0);
 }
 
 AdjointHarmonicSolver::~AdjointHarmonicSolver()
 {
-  std::cout << "NativeSolid::~AdjointHarmonicSolver()" << std::endl;
+    std::cout << "NativeSolid::~AdjointHarmonicSolver()" << std::endl;
 }
 
-void AdjointHarmonicSolver::Iterate(double& t0, double& tf, Structure *structure){
-  unsigned int _nTotal = _nDof*_nOmega;
-  unsigned int fDoF = 2+fixedDof*_nOmega; // DoF to be fixed to 0
-  unsigned int counter;
+void AdjointHarmonicSolver::Iterate(double &t0, double &tf, Structure *structure)
+{
+    unsigned int _nTotal = _nDof * _nOmega;
+    unsigned int fDoF = 2 + fixedDof * _nOmega; // DoF to be fixed to 0
+    unsigned int counter;
 
-  CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain
-  CVector qdot_temp(_nOmega, 0.0);
-  CVector f_temp(_nOmega, 0.0);
-  CVector fdot_temp(_nOmega, 0.0);
-  CVector temp_hold(_nOmega, 0.0); // Temporary hold for the frequency domain things
+    CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain
+    CVector qdot_temp(_nOmega, 0.0);
+    CVector f_temp(_nOmega, 0.0);
+    CVector fdot_temp(_nOmega, 0.0);
+    CVector temp_hold(_nOmega, 0.0); // Temporary hold for the frequency domain things
 
-  CVector x_temp(2*_nTotal, 0.0); // Old & new? solution of the state-space problem in the frequency domain
-  CVector RHS(2*_nTotal, 0.0); // Load vector
-  CVector Res(2*_nTotal, 0.0); // Residual vector
-  CMatrix MM(2*_nTotal, 2*_nTotal, 0.0);
-  CMatrix KK(2*_nTotal, 2*_nTotal, 0.0);
-  CMatrix AAA(2*_nTotal, 2*_nTotal, 0.0); // Frequency derivative matrix
-  CMatrix LHS(2*_nTotal, 2*_nTotal, 0.0);
-  CMatrix dRes(2*_nTotal, 2*_nTotal, 0.0);
-  CMatrix Aux(2*_nTotal, 2*_nTotal, 0.0);
-  CVector dResdw(2*_nTotal, 0.0);
+    CVector x_temp(2 * _nTotal, 0.0); // Old & new? solution of the state-space problem in the frequency domain
+    CVector RHS(2 * _nTotal, 0.0);    // Load vector
+    CVector Res(2 * _nTotal, 0.0);    // Residual vector
+    CMatrix MM(2 * _nTotal, 2 * _nTotal, 0.0);
+    CMatrix KK(2 * _nTotal, 2 * _nTotal, 0.0);
+    CMatrix AAA(2 * _nTotal, 2 * _nTotal, 0.0); // Frequency derivative matrix
+    CMatrix LHS(2 * _nTotal, 2 * _nTotal, 0.0);
+    CMatrix dRes(2 * _nTotal, 2 * _nTotal, 0.0);
+    CMatrix Aux(2 * _nTotal, 2 * _nTotal, 0.0);
+    CVector dResdw(2 * _nTotal, 0.0);
 
-  for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
-  {
-    KK.SetElm(_nTotal+iOmega+1, iOmega+1, structure->Get_Kh());
-    KK.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1, structure->Get_Ch());
-    KK.SetElm(iOmega+1, _nTotal+iOmega+1, -1.);
-
-    MM.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1, structure->Get_m());
-    MM.SetElm(iOmega+1, iOmega+1, 1.);
-
-    if (_nDof == 2)
-    {
-      KK.SetElm(_nTotal+iOmega+1+_nOmega, iOmega+1+_nOmega, structure->Get_Ka());
-      KK.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, structure->Get_Ca());
-      KK.SetElm(iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, -1.);
-
-      MM.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1+_nOmega, structure->Get_If());
-      MM.SetElm(_nTotal+iOmega+1, _nTotal+iOmega+1+_nOmega, structure->Get_S());
-      MM.SetElm(_nTotal+iOmega+1+_nOmega, _nTotal+iOmega+1, structure->Get_S());
-      MM.SetElm(iOmega+1+_nOmega, iOmega+1+_nOmega, 1.);
-    }
-  }
-
-  for (int iHarmonic = 1; iHarmonic <= _nHarmonic; iHarmonic++){ // It... is signed down there. Option: iHarmonic*-1.0. Not that anybody will use that many harmonics!
-    AAA.SetElm(2*iHarmonic+1, 2*iHarmonic, -iHarmonic*1.0);
-    AAA.SetElm(2*iHarmonic, 2*iHarmonic+1, iHarmonic*1.0);
-    // For the dot ones
-    AAA.SetElm(2*iHarmonic+1+_nTotal, 2*iHarmonic+_nTotal, -iHarmonic*1.0);
-    AAA.SetElm(2*iHarmonic+_nTotal, 2*iHarmonic+1+_nTotal, iHarmonic*1.0);
-    if (_nDof == 2)
-    {
-      AAA.SetElm(2*iHarmonic+1+_nOmega, 2*iHarmonic+_nOmega, -iHarmonic*1.0);
-      AAA.SetElm(2*iHarmonic+_nOmega, 2*iHarmonic+1+_nOmega, iHarmonic*1.0);
-      // For the dot ones
-      AAA.SetElm(2*iHarmonic+1+_nTotal+_nOmega, 2*iHarmonic+_nTotal+_nOmega, -iHarmonic*1.0);
-      AAA.SetElm(2*iHarmonic+_nTotal+_nOmega, 2*iHarmonic+1+_nTotal+_nOmega, iHarmonic*1.0);
-    }
-  }
-
-  for (unsigned int iDof = 0; iDof < _nDof; iDof++)
-  {
-    unsigned int dofStart = iDof*_nOmega;
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      q_temp[jOmega] = q[jOmega+dofStart];
-      qdot_temp[jOmega] = qdot[jOmega+dofStart];
-      f_temp[jOmega] = qDerivative[jOmega+dofStart];
-      fdot_temp[jOmega] = qDerivative[jOmega+dofStart+_nTotal];
-    }
-    temp_hold = MatVecProd(E, q_temp);
-    if (iDof == 1)
-    {
-      amplitude = temp_hold[1]*temp_hold[1];
-    }
-    
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      x_temp[jOmega+dofStart] = temp_hold[jOmega];
-    }
-    temp_hold = MatVecProd(E, qdot_temp);
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      x_temp[jOmega+dofStart+_nTotal] = temp_hold[jOmega];
-    }
-    temp_hold = MatVecProd(Em1T, f_temp);
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      RHS[jOmega+dofStart+_nTotal] = temp_hold[jOmega];
-    }
-    temp_hold = MatVecProd(Em1T, fdot_temp);
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      RHS[jOmega+dofStart] = temp_hold[jOmega];
-    }
-  }
-
-  if (_nDof == 2)
-  {
-    CMatrix LoadGradientFr;
-    LoadGradientFr.Initialize(_nOmega, _nOmega, 0.);
-    LoadGradientFr = MatMatProd(LoadGradient, Em1);
-    LoadGradientFr = MatMatProd(E, LoadGradientFr);
     for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
     {
-      for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-      {
-        KK.SetElm(iOmega+1+_nOmega+_nTotal, jOmega+1+_nOmega, KK.GetElm(iOmega+1+_nOmega+_nTotal, jOmega+1+_nOmega)+LoadGradientFr.GetElm(iOmega+1, jOmega+1));
-      }
-    }
-  }
+        KK.SetElm(_nTotal + iOmega + 1, iOmega + 1, structure->Get_Kh());
+        KK.SetElm(_nTotal + iOmega + 1, _nTotal + iOmega + 1, structure->Get_Ch());
+        KK.SetElm(iOmega + 1, _nTotal + iOmega + 1, -1.);
 
-  Aux = MatMatProd(MM, AAA);
-  LHS = omega*Aux;
-  LHS += KK;
-  dResdw = MatVecProd(Aux, x_temp);
+        MM.SetElm(_nTotal + iOmega + 1, _nTotal + iOmega + 1, structure->Get_m());
+        MM.SetElm(iOmega + 1, iOmega + 1, 1.);
 
-  counter = 0;
-  for (unsigned int i = 0; i < 2*_nTotal; i++)
-  {
-    dRes.SetElm(2*_nTotal, i+1, dResdw[i]);
-    if (i == fDoF)
-    {
-      continue;
-    }
-    for (unsigned int j = 0; j < 2*_nTotal; j++)
-    {
-      dRes.SetElm(counter+1, j+1, LHS.GetElm(j+1, i+1)); // Filled with transposed elements
-    }
-    counter++;
-  }
-  counter = 0;
-  for (unsigned int i = 0; i < _nTotal; i++)
-  {
-    Res[_nTotal+i-1] = RHS[i];
-    if (i == fDoF)
-    {
-      continue;
-    }
-    Res[counter] = RHS[i+_nTotal];
-    counter++;
-  }
-  if (pitchObjFun && _nDof == 2) // PITCH_AMPLITUDE only makes sense for airfoils that can pitch
-  {
-    Res[_nOmega+1] += 2*x_temp[_nOmega+1]; // This isn't how it should be done BUT x_temp is [plunge;pitch;plungedot;pitchdot]
-  }
+        if (_nDof == 2)
+        {
+            KK.SetElm(_nTotal + iOmega + 1 + _nOmega, iOmega + 1 + _nOmega, structure->Get_Ka());
+            KK.SetElm(_nTotal + iOmega + 1 + _nOmega, _nTotal + iOmega + 1 + _nOmega, structure->Get_Ca());
+            KK.SetElm(iOmega + 1 + _nOmega, _nTotal + iOmega + 1 + _nOmega, -1.);
 
-  Res[2*_nTotal-1] = AdjointOmega;
-
-  SolveSys(dRes, Res);
-
-  counter = _nTotal; // The force is applied to the lower equations
-  for (unsigned int iDof = 0; iDof < _nDof; iDof++)
-  {
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      temp_hold[jOmega] = Res[counter];
-      counter++;
+            MM.SetElm(_nTotal + iOmega + 1 + _nOmega, _nTotal + iOmega + 1 + _nOmega, structure->Get_If());
+            MM.SetElm(_nTotal + iOmega + 1, _nTotal + iOmega + 1 + _nOmega, structure->Get_S());
+            MM.SetElm(_nTotal + iOmega + 1 + _nOmega, _nTotal + iOmega + 1, structure->Get_S());
+            MM.SetElm(iOmega + 1 + _nOmega, iOmega + 1 + _nOmega, 1.);
+        }
     }
-    q_temp = MatVecProd(ET, temp_hold);
-    for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-    {
-      AdjointLoad[jOmega+iDof*_nOmega] = q_temp[jOmega]; // dS/df = -1! Loads are positive on the right hand side
+
+    for (int iHarmonic = 1; iHarmonic <= _nHarmonic; iHarmonic++)
+    { // It... is signed down there. Option: iHarmonic*-1.0. Not that anybody will use that many harmonics!
+        AAA.SetElm(2 * iHarmonic + 1, 2 * iHarmonic, -iHarmonic * 1.0);
+        AAA.SetElm(2 * iHarmonic, 2 * iHarmonic + 1, iHarmonic * 1.0);
+        // For the dot ones
+        AAA.SetElm(2 * iHarmonic + 1 + _nTotal, 2 * iHarmonic + _nTotal, -iHarmonic * 1.0);
+        AAA.SetElm(2 * iHarmonic + _nTotal, 2 * iHarmonic + 1 + _nTotal, iHarmonic * 1.0);
+        if (_nDof == 2)
+        {
+            AAA.SetElm(2 * iHarmonic + 1 + _nOmega, 2 * iHarmonic + _nOmega, -iHarmonic * 1.0);
+            AAA.SetElm(2 * iHarmonic + _nOmega, 2 * iHarmonic + 1 + _nOmega, iHarmonic * 1.0);
+            // For the dot ones
+            AAA.SetElm(2 * iHarmonic + 1 + _nTotal + _nOmega, 2 * iHarmonic + _nTotal + _nOmega, -iHarmonic * 1.0);
+            AAA.SetElm(2 * iHarmonic + _nTotal + _nOmega, 2 * iHarmonic + 1 + _nTotal + _nOmega, iHarmonic * 1.0);
+        }
     }
-  }
+
+    for (unsigned int iDof = 0; iDof < _nDof; iDof++)
+    {
+        unsigned int dofStart = iDof * _nOmega;
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            q_temp[jOmega] = q[jOmega + dofStart];
+            qdot_temp[jOmega] = qdot[jOmega + dofStart];
+            f_temp[jOmega] = qDerivative[jOmega + dofStart];
+            fdot_temp[jOmega] = qDerivative[jOmega + dofStart + _nTotal];
+        }
+        temp_hold = MatVecProd(E, q_temp);
+        if (iDof == 1)
+        {
+            amplitude = temp_hold[1] * temp_hold[1];
+        }
+
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            x_temp[jOmega + dofStart] = temp_hold[jOmega];
+        }
+        temp_hold = MatVecProd(E, qdot_temp);
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            x_temp[jOmega + dofStart + _nTotal] = temp_hold[jOmega];
+        }
+        temp_hold = MatVecProd(Em1T, f_temp);
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            RHS[jOmega + dofStart + _nTotal] = temp_hold[jOmega];
+        }
+        temp_hold = MatVecProd(Em1T, fdot_temp);
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            RHS[jOmega + dofStart] = temp_hold[jOmega];
+        }
+    }
+
+    if (_nDof == 2)
+    {
+        CMatrix LoadGradientFr;
+        LoadGradientFr.Initialize(_nOmega, _nOmega, 0.);
+        LoadGradientFr = MatMatProd(LoadGradient, Em1);
+        LoadGradientFr = MatMatProd(E, LoadGradientFr);
+        for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
+        {
+            for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+            {
+                KK.SetElm(iOmega + 1 + _nOmega + _nTotal, jOmega + 1 + _nOmega, KK.GetElm(iOmega + 1 + _nOmega + _nTotal, jOmega + 1 + _nOmega) + LoadGradientFr.GetElm(iOmega + 1, jOmega + 1));
+            }
+        }
+    }
+
+    Aux = MatMatProd(MM, AAA);
+    LHS = omega * Aux;
+    LHS += KK;
+    dResdw = MatVecProd(Aux, x_temp);
+
+    counter = 0;
+    for (unsigned int i = 0; i < 2 * _nTotal; i++)
+    {
+        dRes.SetElm(2 * _nTotal, i + 1, dResdw[i]);
+        if (i == fDoF)
+        {
+            continue;
+        }
+        for (unsigned int j = 0; j < 2 * _nTotal; j++)
+        {
+            dRes.SetElm(counter + 1, j + 1, LHS.GetElm(j + 1, i + 1)); // Filled with transposed elements
+        }
+        counter++;
+    }
+    counter = 0;
+    for (unsigned int i = 0; i < _nTotal; i++)
+    {
+        Res[_nTotal + i - 1] = RHS[i];
+        if (i == fDoF)
+        {
+            continue;
+        }
+        Res[counter] = RHS[i + _nTotal];
+        counter++;
+    }
+    if (pitchObjFun && _nDof == 2) // PITCH_AMPLITUDE only makes sense for airfoils that can pitch
+    {
+        Res[_nOmega + 1] += 2 * x_temp[_nOmega + 1]; // This isn't how it should be done BUT x_temp is [plunge;pitch;plungedot;pitchdot]
+    }
+
+    Res[2 * _nTotal - 1] = AdjointOmega;
+
+    SolveSys(dRes, Res);
+
+    counter = _nTotal; // The force is applied to the lower equations
+    for (unsigned int iDof = 0; iDof < _nDof; iDof++)
+    {
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            temp_hold[jOmega] = Res[counter];
+            counter++;
+        }
+        q_temp = MatVecProd(ET, temp_hold);
+        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
+        {
+            AdjointLoad[jOmega + iDof * _nOmega] = q_temp[jOmega]; // dS/df = -1! Loads are positive on the right hand side
+        }
+    }
 }
 
-void AdjointHarmonicSolver::SetHBMatrices(){
-  cout <<  "AdjointHarmonicSolver::SetHBMatrices()" << endl;
-  E.Reset();
-  ET.Reset();
-  for (unsigned short i = 1; i <= _nOmega; i++)
-  {
-    E.SetElm(i,i,1.0);
-    ET.SetElm(i, i, 1.0);
-  }
-  
-
-  for (unsigned short i = 1; i <= _nHarmonic; i++){
-    AA.SetElm(2*i+1, 2*i, -omega*i);
-    AA.SetElm(2*i, 2*i+1, omega*i);
-    for (unsigned short j = 0; j < _nOmega; j++)
+void AdjointHarmonicSolver::SetHBMatrices()
+{
+    std::cout << "AdjointHarmonicSolver::SetHBMatrices()" << std::endl;
+    E.Reset();
+    ET.Reset();
+    for (unsigned short i = 1; i <= _nOmega; i++)
     {
-      Em1.SetElm(j+1, 2*i, cos(2*M_PI*j/_nOmega*i));
-      Em1.SetElm(j+1, 2*i+1, sin(2*M_PI*j/_nOmega*i));
-      Em1T.SetElm(2*i, j+1, cos(2*M_PI*j/_nOmega*i));
-      Em1T.SetElm(2*i+1, j+1, sin(2*M_PI*j/_nOmega*i));
+        E.SetElm(i, i, 1.0);
+        ET.SetElm(i, i, 1.0);
     }
-  }
 
-  SolveSys(Em1, E);
-  SolveSys(Em1T, ET);
-  d = MatMatProd(AA, E);
-  d = MatMatProd(Em1, d);
-  d2 = MatMatProd(d, d);
+    for (unsigned short i = 1; i <= _nHarmonic; i++)
+    {
+        AA.SetElm(2 * i + 1, 2 * i, -omega * i);
+        AA.SetElm(2 * i, 2 * i + 1, omega * i);
+        for (unsigned short j = 0; j < _nOmega; j++)
+        {
+            Em1.SetElm(j + 1, 2 * i, cos(2 * M_PI * j / _nOmega * i));
+            Em1.SetElm(j + 1, 2 * i + 1, sin(2 * M_PI * j / _nOmega * i));
+            Em1T.SetElm(2 * i, j + 1, cos(2 * M_PI * j / _nOmega * i));
+            Em1T.SetElm(2 * i + 1, j + 1, sin(2 * M_PI * j / _nOmega * i));
+        }
+    }
+
+    SolveSys(Em1, E);
+    SolveSys(Em1T, ET);
+    d = MatMatProd(AA, E);
+    d = MatMatProd(Em1, d);
+    d2 = MatMatProd(d, d);
 }
 
-double AdjointHarmonicSolver::GetStiffnessDerivative(unsigned int dof){
-  double dJdk = 0.;
-  CVector dSdk(_nDof*_nOmega, 0.0);
-  
-  if (dof < _nDof)
-  {
-    for (unsigned int i = 0; i < _nOmega; i++)
+double AdjointHarmonicSolver::GetStiffnessDerivative(unsigned int dof)
+{
+    double dJdk = 0.;
+    CVector dSdk(_nDof * _nOmega, 0.0);
+
+    if (dof < _nDof)
     {
-      dSdk[i+dof*_nOmega] = q[i+dof*_nOmega];
+        for (unsigned int i = 0; i < _nOmega; i++)
+        {
+            dSdk[i + dof * _nOmega] = q[i + dof * _nOmega];
+        }
+        dJdk -= AdjointLoad.dotProd(dSdk); // Order does not matter for scalars
     }
-    dJdk -= AdjointLoad.dotProd(dSdk); // Order does not matter for scalars
-  }
-  
-  return dJdk;
+
+    return dJdk;
 }
 
-double AdjointHarmonicSolver::GetDampingDerivative(unsigned int dof){
-  double dJdc = 0.;
-  CVector dSdc(_nDof*_nOmega, 0.0);
+double AdjointHarmonicSolver::GetDampingDerivative(unsigned int dof)
+{
+    double dJdc = 0.;
+    CVector dSdc(_nDof * _nOmega, 0.0);
 
-  if (dof < _nDof)
-  {
-    for (unsigned int i = 0; i < _nOmega; i++)
+    if (dof < _nDof)
     {
-      dSdc[i+dof*_nOmega] = qdot[i+dof*_nOmega];
+        for (unsigned int i = 0; i < _nOmega; i++)
+        {
+            dSdc[i + dof * _nOmega] = qdot[i + dof * _nOmega];
+        }
+        dJdc -= AdjointLoad.dotProd(dSdc); // Order does not matter for scalars
     }
-    dJdc -= AdjointLoad.dotProd(dSdc); // Order does not matter for scalars
-  }
-  return dJdc;
+    return dJdc;
 }
 
-double AdjointHarmonicSolver::GetMassDerivative(unsigned int dof){
-  double dJdm = 0.;
-  CVector dSdm(_nDof*_nOmega, 0.0);
+double AdjointHarmonicSolver::GetMassDerivative(unsigned int dof)
+{
+    double dJdm = 0.;
+    CVector dSdm(_nDof * _nOmega, 0.0);
 
-  if (dof == 0)
-  {
-    for (unsigned int i = 0; i < _nOmega; i++)
+    if (dof == 0)
     {
-      dSdm[i] += qddot[i];
+        for (unsigned int i = 0; i < _nOmega; i++)
+        {
+            dSdm[i] += qddot[i];
+        }
     }
-  }
-  else if (dof == 1 && _nDof == 2)
-  {
-    for (unsigned int i = 0; i < _nOmega; i++)
+    else if (dof == 1 && _nDof == 2)
     {
-      dSdm[i+_nOmega] = qddot[i+_nOmega];
+        for (unsigned int i = 0; i < _nOmega; i++)
+        {
+            dSdm[i + _nOmega] = qddot[i + _nOmega];
+        }
     }
-  }
-  
-  dJdm -= AdjointLoad.dotProd(dSdm); // Order does not matter for scalars
-  return dJdm;
+
+    dJdm -= AdjointLoad.dotProd(dSdm); // Order does not matter for scalars
+    return dJdm;
 }
 
-double AdjointHarmonicSolver::GetImbalanceDerivative(){
-  double dJdS = 0.;
-  CVector dSdS(_nDof*_nOmega, 0.0);
+double AdjointHarmonicSolver::GetImbalanceDerivative()
+{
+    double dJdS = 0.;
+    CVector dSdS(_nDof * _nOmega, 0.0);
 
-  if (_nDof == 2)
-  {
-    for (unsigned int i = 0; i < _nOmega; i++)
+    if (_nDof == 2)
     {
-      if (_nDof == 2)
-      {
-        dSdS[i+_nOmega] += qddot[i];
-        dSdS[i] += qddot[i+_nOmega]; //TODO: Remove hardcoding but I need the structure boo
-      }
+        for (unsigned int i = 0; i < _nOmega; i++)
+        {
+            if (_nDof == 2)
+            {
+                dSdS[i + _nOmega] += qddot[i];
+                dSdS[i] += qddot[i + _nOmega]; // TODO: Remove hardcoding but I need the structure boo
+            }
+        }
     }
-  }
-  dJdS -= AdjointLoad.dotProd(dSdS); // Order does not matter for scalars
-  return dJdS;
+    dJdS -= AdjointLoad.dotProd(dSdS); // Order does not matter for scalars
+    return dJdS;
 }

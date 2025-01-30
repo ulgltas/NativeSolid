@@ -1,6 +1,9 @@
 
 FIND_PATH(CBLAS_INCLUDE_DIR NAMES cblas.h HINTS ${CBLAS_INCLUDE_CUSTOM_PATHS} PATHS ${CBLAS_INCLUDE_SEARCH_PATHS})
-FIND_LIBRARY(CBLAS_LIBRARIES NAMES cblas HINTS ${CBLAS_LIB_CUSTOM_PATHS} PATHS ${CBLAS_LIB_SEARCH_PATHS})
+# on Ubuntu 20.04, 
+#   - cblas.so has been merged into blas.so (libblas-dev or libopenblas-dev package) 
+#   - libatlas-dev cannot be used because cblas.h does not contain an extern "C" section
+FIND_LIBRARY(CBLAS_LIBRARIES NAMES cblas blas HINTS ${CBLAS_LIB_CUSTOM_PATHS} PATHS ${CBLAS_LIB_SEARCH_PATHS})
 
 FIND_LIBRARY(BLAS_LIBRARIES NAMES blas HINTS ${BLAS_LIB_CUSTOM_PATHS} PATHS ${BLAS_LIB_SEARCH_PATHS})
 

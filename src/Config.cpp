@@ -1,101 +1,133 @@
-#include "../include/config.h"
+#include "Config.h"
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
 #include <algorithm>
 
-using namespace std;
-
-Config::Config(string filename):ConfigFileName(filename)
+Config::Config(std::string filename) : ConfigFileName(filename)
 {
-    // Setting defaults here
-    NUMBER_DESIGN_VARIABLES = 1;
 }
 
 Config::~Config()
 {
-
 }
 
-Config* Config::GetAddress()
+Config *Config::GetAddress()
 {
     return this;
 }
 
 void Config::ReadConfig()
 {
-    string delimiter = "=";
+    std::string delimiter = "=";
     size_t pos;
-    string text_line, option;
-    ifstream InputFile;
-    InputFile.open(ConfigFileName.c_str(), ios::in);
-    if(InputFile.fail()){
-      cerr << "Invalid configuration file name : " << ConfigFileName << endl;
-      throw(-1);
+    std::string text_line, option;
+    std::ifstream InputFile;
+    InputFile.open(ConfigFileName.c_str(), std::ios::in);
+    if (InputFile.fail())
+    {
+        std::cerr << "Invalid configuration file name : " << ConfigFileName << std::endl;
+        throw(-1);
     }
     char caract;
-    while (getline(InputFile,text_line))
+    while (getline(InputFile, text_line))
     {
         caract = text_line[0];
         if (caract == '%')
-	{
-	}
-	else
-	{
-	pos = text_line.find(delimiter);
-	option = text_line.substr(0,pos);
-        text_line.erase(0,pos+delimiter.length());
-        option.erase(remove(option.begin(), option.end(), ' '), option.end());
-	text_line.erase(remove(text_line.begin(), text_line.end(),' '),text_line.end());
-	if (option == "CSD_SOLVER") CSD_SOLVER = text_line;
-    else if (option == "KIND_PROBLEM") KIND_PROBLEM = text_line;
-    else if (option == "OBJ_FUNCTION") OBJ_FUNCTION = text_line;
-	else if (option == "MESH_FILE") MESH_FILE = text_line;
-	else if (option == "UNSTEADY_SIMULATION") UNSTEADY_SIMULATION = text_line;
-	else if (option == "STRUCT_TYPE") STRUCT_TYPE = text_line;
-        else if (option == "LINEARIZE") LINEARIZE = text_line;
-        else if (option == "INTEGRATION_ALGO") INTEGRATION_ALGO = text_line;
-        else if (option == "RESTART_SOL") RESTART_SOL = text_line;
-    else if (option == "FIXED_DOF") FIXED_DOF = text_line;
-	else if (option == "RESTART_FILE") RESTART_FILE = text_line;
-	else if (option == "MOVING_MARKER") MOVING_MARKER = text_line;
-	else if (option == "SPRING_MASS") SPRING_MASS = atof(text_line.c_str());
-	else if (option == "INERTIA_CG") INERTIA_CG = atof(text_line.c_str());
-	else if (option == "INERTIA_FLEXURAL") INERTIA_FLEXURAL = atof(text_line.c_str());
-	else if (option == "SPRING_STIFFNESS") SPRING_STIFFNESS = atof(text_line.c_str());
-	else if (option == "SPRING_DAMPING") SPRING_DAMPING = atof(text_line.c_str());
-	else if (option == "TORSIONAL_STIFFNESS") TORSIONAL_STIFFNESS = atof(text_line.c_str());
-	else if (option == "TORSIONAL_DAMPING") TORSIONAL_DAMPING = atof(text_line.c_str());
-	else if (option == "CORD") CORD = atof(text_line.c_str());
-	else if (option == "FLEXURAL_AXIS") FLEXURAL_AXIS = atof(text_line.c_str());
-	else if (option == "GRAVITY_CENTER") GRAVITY_CENTER = atof(text_line.c_str());
-        else if (option == "INITIAL_DISP") INITIAL_DISP = atof(text_line.c_str());
-        else if (option == "INITIAL_ANGLE") INITIAL_ANGLE = atof(text_line.c_str());
-	else if (option == "START_TIME") START_TIME = atof(text_line.c_str());
-	else if (option == "DELTA_T") DELTA_T = atof(text_line.c_str());
-	else if (option == "DELTA_ITER_WRITE") DELTAITERWRITE = atol(text_line.c_str());
-	else if (option == "STOP_TIME") STOP_TIME = atof(text_line.c_str());
-    else if (option == "OMEGA") OMEGA = atof(text_line.c_str());
-    else if (option == "NUMBER_HARMONICS") NUMBER_HARMONICS = atol(text_line.c_str());
-	else if (option == "RHO") RHO = atof(text_line.c_str());
-    else if (option == "DESIGN_VARIABLE_KIND") DESIGN_VARIABLE_KIND = text_line;
-    else if (option == "NUMBER_DESIGN_VARIABLES") NUMBER_DESIGN_VARIABLES = atol(text_line.c_str());
-        else cout << "The option " + option + " is not recognized !" << endl;
-	}
+        {
+        }
+        else
+        {
+            pos = text_line.find(delimiter);
+            option = text_line.substr(0, pos);
+            text_line.erase(0, pos + delimiter.length());
+            option.erase(remove(option.begin(), option.end(), ' '), option.end());
+            text_line.erase(remove(text_line.begin(), text_line.end(), ' '), text_line.end());
+            if (option == "CSD_SOLVER")
+                CSD_SOLVER = text_line;
+            else if (option == "MESH_FILE")
+                MESH_FILE = text_line;
+            else if (option == "UNSTEADY_SIMULATION")
+                UNSTEADY_SIMULATION = text_line;
+            else if (option == "STRUCT_TYPE")
+                STRUCT_TYPE = text_line;
+            else if (option == "LINEARIZE")
+                LINEARIZE = text_line;
+            else if (option == "INTEGRATION_ALGO")
+                INTEGRATION_ALGO = text_line;
+            else if (option == "RESTART_SOL")
+                RESTART_SOL = text_line;
+            else if (option == "RESTART_FILE")
+                RESTART_FILE = text_line;
+            else if (option == "MOVING_MARKER")
+                MOVING_MARKER = text_line;
+            else if (option == "SPRING_MASS")
+                SPRING_MASS = atof(text_line.c_str());
+            else if (option == "INERTIA_CG")
+                INERTIA_CG = atof(text_line.c_str());
+            else if (option == "INERTIA_FLEXURAL")
+                INERTIA_FLEXURAL = atof(text_line.c_str());
+            else if (option == "SPRING_STIFFNESS")
+                SPRING_STIFFNESS = atof(text_line.c_str());
+            else if (option == "SPRING_DAMPING")
+                SPRING_DAMPING = atof(text_line.c_str());
+            else if (option == "TORSIONAL_STIFFNESS")
+                TORSIONAL_STIFFNESS = atof(text_line.c_str());
+            else if (option == "TORSIONAL_DAMPING")
+                TORSIONAL_DAMPING = atof(text_line.c_str());
+            else if (option == "CORD")
+                CORD = atof(text_line.c_str());
+            else if (option == "FLEXURAL_AXIS")
+                FLEXURAL_AXIS = atof(text_line.c_str());
+            else if (option == "GRAVITY_CENTER")
+                GRAVITY_CENTER = atof(text_line.c_str());
+            else if (option == "INITIAL_DISP")
+                INITIAL_DISP = atof(text_line.c_str());
+            else if (option == "INITIAL_ANGLE")
+                INITIAL_ANGLE = atof(text_line.c_str());
+            else if (option == "START_TIME")
+                START_TIME = atof(text_line.c_str());
+            else if (option == "DELTA_T")
+                DELTA_T = atof(text_line.c_str());
+            else if (option == "DELTA_ITER_WRITE")
+                DELTAITERWRITE = atol(text_line.c_str());
+            else if (option == "STOP_TIME")
+                STOP_TIME = atof(text_line.c_str());
+            else if (option == "OMEGA")
+                OMEGA = atof(text_line.c_str());
+            else if (option == "NUMBER_HARMONICS")
+                NUMBER_HARMONICS = atol(text_line.c_str());
+            else if (option == "RHO")
+                RHO = atof(text_line.c_str());
+            else if (option == "DESIGN_VARIABLE_KIND")
+                DESIGN_VARIABLE_KIND = text_line;
+            else if (option == "NUMBER_DESIGN_VARIABLES")
+                NUMBER_DESIGN_VARIABLES = atol(text_line.c_str());
+            else
+                std::cout << "The option " + option + " is not recognized !" << std::endl;
+        }
     }
     InputFile.close();
 
-    if (CSD_SOLVER == "NATIVE") cout << "The Native solver has been chosen" << endl;
-    else cout << "Cannot run the solver with other value than NATIVE for CSD_SOLVER option !" << endl;
+    if (CSD_SOLVER == "NATIVE")
+        std::cout << "The Native solver has been chosen" << std::endl;
+    else
+        std::cout << "Cannot run the solver with other value than NATIVE for CSD_SOLVER option !" << std::endl;
 
-    if (UNSTEADY_SIMULATION == "YES") cout << "Dynamic structure computation" << endl;
-    else if (UNSTEADY_SIMULATION == "HARMONIC") cout << "Harmonic balance structure computation" << endl;
-    else cout << "Static structure computation" << endl;
+    if (UNSTEADY_SIMULATION == "YES")
+        std::cout << "Dynamic structure computation" << std::endl;
+    else if (UNSTEADY_SIMULATION == "HARMONIC")
+        std::cout << "Harmonic balance structure computation" << std::endl;
+    else
+        std::cout << "Static structure computation" << std::endl;
 
-    if (STRUCT_TYPE == "SPRING_HOR" || STRUCT_TYPE == "SPRING_VER") cout << "Structural model is a plunging spring" << endl;
-    else if (STRUCT_TYPE == "AIRFOIL") cout << "Structural model is a pitching plunging airfoil" << endl;
-    else cout << "The specified structural model is not recognized or implemented yet !" << endl;
+    if (STRUCT_TYPE == "SPRING_HOR" || STRUCT_TYPE == "SPRING_VER")
+        std::cout << "Structural model is a plunging spring" << std::endl;
+    else if (STRUCT_TYPE == "AIRFOIL")
+        std::cout << "Structural model is a pitching plunging airfoil" << std::endl;
+    else
+        std::cout << "The specified structural model is not recognized or implemented yet !" << std::endl;
 }
 
 std::string Config::GetMeshFile()
@@ -133,7 +165,8 @@ std::string Config::GetStructType()
     return STRUCT_TYPE;
 }
 
-std::string Config::GetLinearize(){
+std::string Config::GetLinearize()
+{
     return LINEARIZE;
 }
 
@@ -167,75 +200,93 @@ double Config::GetStartTime()
     return START_TIME;
 }
 
-double Config::GetDeltaT(){
+double Config::GetDeltaT()
+{
     return DELTA_T;
 }
 
-unsigned long Config::GetDeltaIterWrite(){
+unsigned long Config::GetDeltaIterWrite()
+{
     return DELTAITERWRITE;
 }
 
-double Config::GetStopTime(){
+double Config::GetStopTime()
+{
     return STOP_TIME;
 }
 
-double Config::GetSpringStiffness(){
+double Config::GetSpringStiffness()
+{
     return SPRING_STIFFNESS;
 }
 
-double Config::GetSpringMass(){
+double Config::GetSpringMass()
+{
     return SPRING_MASS;
 }
 
-double Config::GetInertiaCG(){
+double Config::GetInertiaCG()
+{
     return INERTIA_CG;
 }
 
-double Config::GetInertiaFlexural(){
+double Config::GetInertiaFlexural()
+{
     return INERTIA_FLEXURAL;
 }
 
-double Config::GetSpringDamping(){
+double Config::GetSpringDamping()
+{
     return SPRING_DAMPING;
 }
 
-double Config::GetTorsionalStiffness(){
-  return TORSIONAL_STIFFNESS;
+double Config::GetTorsionalStiffness()
+{
+    return TORSIONAL_STIFFNESS;
 }
 
-double Config::GetTorsionalDamping(){
-  return TORSIONAL_DAMPING;
+double Config::GetTorsionalDamping()
+{
+    return TORSIONAL_DAMPING;
 }
 
-double Config::GetCord(){
-  return CORD;
+double Config::GetCord()
+{
+    return CORD;
 }
 
-double Config::GetFlexuralAxis(){
-  return FLEXURAL_AXIS;
+double Config::GetFlexuralAxis()
+{
+    return FLEXURAL_AXIS;
 }
 
-double Config::GetGravityCenter(){
+double Config::GetGravityCenter()
+{
     return GRAVITY_CENTER;
 }
 
-double Config::GetInitialDisp(){
-  return INITIAL_DISP;
+double Config::GetInitialDisp()
+{
+    return INITIAL_DISP;
 }
 
-double Config::GetInitialAngle(){
-  return INITIAL_ANGLE;
+double Config::GetInitialAngle()
+{
+    return INITIAL_ANGLE;
 }
 
-double Config::GetOmega(){
+double Config::GetOmega()
+{
     return OMEGA;
 }
 
-unsigned long Config::GetNumberHarmonics(){
+unsigned long Config::GetNumberHarmonics()
+{
     return NUMBER_HARMONICS;
 }
 
-double Config::GetRho(){
+double Config::GetRho()
+{
     return RHO;
 }
 

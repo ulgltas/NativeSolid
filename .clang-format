@@ -1,0 +1,11 @@
+---
+# https://clang.llvm.org/docs/ClangFormatStyleOptions.html#
+# the "Visual Studio" style is similar to:
+BasedOnStyle: LLVM
+UseTab: Never
+IndentWidth: 4
+BreakBeforeBraces: Allman
+AccessModifierOffset: -4
+SortIncludes: false
+ColumnLimit: 0
+...

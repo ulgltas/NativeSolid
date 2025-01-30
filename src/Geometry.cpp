@@ -38,6 +38,16 @@ Point::Point()
     Force[0] = 0.0;
     Force[1] = 0.0;
     Force[2] = 0.0;
+
+    DispAdj = new double[3];
+    DispAdj[0] = 0.0;
+    DispAdj[1] = 0.0;
+    DispAdj[2] = 0.0;
+
+    LoadDerivative = new double[3];
+    LoadDerivative[0] = 0.0;
+    LoadDerivative[1] = 0.0;
+    LoadDerivative[2] = 0.0;
 }
 
 Point::~Point()
@@ -59,6 +69,12 @@ Point::~Point()
 
     delete[] Force;
     Force = NULL;
+
+    delete[] DispAdj;
+    DispAdj = NULL;
+
+    delete[] LoadDerivative;
+    LoadDerivative = NULL;
 }
 
 double *Point::GetCoord0() const
@@ -187,6 +203,7 @@ Geometry::Geometry(Config *config)
     unsigned long iMarker(0);
     int elemType(0), dummyInt(0);
     int iPoint;
+    int nInst = 2 * config->GetNumberHarmonics() + 1;
 
     Coord[0] = 0.0;
     Coord[1] = 0.0;
@@ -239,13 +256,16 @@ Geometry::Geometry(Config *config)
             textLine.erase(0, 6);
             nPoint = atoi(textLine.c_str());
             std::cout << "Number of points : " << nPoint << std::endl;
-            node = new Point *[nPoint];
+            node = new Point *[nPoint * nInst];
             // std::cout << "JE VAIS REMPLIR" << std::endl;
             for (iPoint = 0; iPoint < nPoint; iPoint++)
             {
                 getline(meshFile, textLine);
                 // if(iPoint == 1) std::cout << textLine << std::endl;
-                node[iPoint] = new Point();
+                for (int iInst = 0; iInst < nInst; iInst++)
+                {
+                    node[iPoint + iInst * nPoint] = new Point();
+                }
                 std::istringstream point_line(textLine);
                 point_line >> Coord[0];
                 // if(iPoint == 1) std::cout << Coord[0] << std::endl;

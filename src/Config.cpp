@@ -46,6 +46,10 @@ void Config::ReadConfig()
             text_line.erase(remove(text_line.begin(), text_line.end(), ' '), text_line.end());
             if (option == "CSD_SOLVER")
                 CSD_SOLVER = text_line;
+            else if (option == "KIND_PROBLEM")
+                KIND_PROBLEM = text_line;
+            else if (option == "OBJ_FUNCTION")
+                OBJ_FUNCTION = text_line;
             else if (option == "MESH_FILE")
                 MESH_FILE = text_line;
             else if (option == "UNSTEADY_SIMULATION")
@@ -58,6 +62,8 @@ void Config::ReadConfig()
                 INTEGRATION_ALGO = text_line;
             else if (option == "RESTART_SOL")
                 RESTART_SOL = text_line;
+            else if (option == "FIXED_DOF")
+                FIXED_DOF = text_line;
             else if (option == "RESTART_FILE")
                 RESTART_FILE = text_line;
             else if (option == "MOVING_MARKER")

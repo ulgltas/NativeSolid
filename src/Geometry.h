@@ -6,7 +6,6 @@
 class Point
 {
     double *Coord0;
-    double *VarCoord; // Change in coordinates due to design variable application
     double *Coord;
     double *Coord_n;
     double *Vel;
@@ -21,7 +20,6 @@ public:
     double *GetCoord0() const;
     double *GetCoord() const;
     double *GetCoord_n() const;
-    double *GetVarCoord() const;
     double *GetVel() const;
     double *GetVel_n() const;
     double *GetForce() const;
@@ -29,7 +27,6 @@ public:
     double *GetLoadDerivative() const;
     void PrintCoord() const;
     void SetCoord0(double *newCoord);
-    void SetVarCoord(double *newCoord);
     void SetCoord(double *newCoord);
     void SetCoord_n(double *newCoord);
     void SetVel(double *newVel);

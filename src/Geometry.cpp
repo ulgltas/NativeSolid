@@ -113,13 +113,6 @@ void Point::SetCoord0(double *newCoord)
     Coord0[2] = newCoord[2];
 }
 
-void Point::SetVarCoord(double *newCoord)
-{
-    VarCoord[0] = newCoord[0];
-    VarCoord[1] = newCoord[1];
-    VarCoord[2] = newCoord[2];
-}
-
 void Point::SetCoord(double *newCoord)
 {
     Coord[0] = newCoord[0];

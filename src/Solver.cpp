@@ -763,9 +763,8 @@ HarmonicSolver::HarmonicSolver(unsigned nDof, unsigned nHarmonic, bool bool_line
     _nHarmonic = nHarmonic;
     _nOmega = 2 * _nHarmonic + 1;
     _nDof = nDof;
-    d.Initialize(_nOmega, _nOmega, 0.0);
-    d2.Initialize(_nOmega, _nOmega, 0.0);
     AA.Initialize(_nOmega, _nOmega, 0.0);
+    AAA.Initialize(2 * _nOmega * _nDof, 2 * _nOmega * _nDof, 0.0);
     deltaOmega = 0.;
     amplitude = 0.;
 }
@@ -855,6 +854,7 @@ void HarmonicSolver::SetInitialState(Config *config, Structure *structure)
 
 void HarmonicSolver::SetHBMatrices()
 {
+    unsigned int _nTotal = _nDof * _nOmega;
     E.Reset();
     for (unsigned short i = 1; i <= _nOmega; i++)
     {
@@ -863,8 +863,22 @@ void HarmonicSolver::SetHBMatrices()
 
     for (unsigned short i = 1; i <= _nHarmonic; i++)
     {
-        AA.SetElm(2 * i + 1, 2 * i, -omega * i);
-        AA.SetElm(2 * i, 2 * i + 1, omega * i);
+        AA.SetElm(2 * i + 1, 2 * i, i * -1.0);
+        AA.SetElm(2 * i, 2 * i + 1, i * 1.0);
+
+        AAA.SetElm(2 * i + 1, 2 * i, i * -1.0);
+        AAA.SetElm(2 * i, 2 * i + 1, i * 1.0);
+        // For the dot ones
+        AAA.SetElm(2 * i + 1 + _nTotal, 2 * i + _nTotal, i * -1.0);
+        AAA.SetElm(2 * i + _nTotal, 2 * i + 1 + _nTotal, i * 1.0);
+        if (_nDof == 2)
+        {
+            AAA.SetElm(2 * i + 1 + _nOmega, 2 * i + _nOmega, i * -1.0);
+            AAA.SetElm(2 * i + _nOmega, 2 * i + 1 + _nOmega, i * 1.0);
+            // For the dot ones
+            AAA.SetElm(2 * i + 1 + _nTotal + _nOmega, 2 * i + _nTotal + _nOmega, i * -1.0);
+            AAA.SetElm(2 * i + _nTotal + _nOmega, 2 * i + 1 + _nTotal + _nOmega, i * 1.0);
+        }
         for (unsigned short j = 0; j < _nOmega; j++)
         {
             Em1.SetElm(j + 1, 2 * i, cos(2 * M_PI * j / _nOmega * i));
@@ -872,9 +886,6 @@ void HarmonicSolver::SetHBMatrices()
         }
     }
     SolveSys(Em1, E);
-    d = MatMatProd(AA, E);
-    d = MatMatProd(Em1, d);
-    d2 = MatMatProd(d, d);
 }
 
 void HarmonicSolver::Iterate(double &t0, double &tf, Structure *structure)
@@ -885,20 +896,22 @@ void HarmonicSolver::Iterate(double &t0, double &tf, Structure *structure)
 
     CVector q_temp(_nOmega, 0.0); // Old & new? solution of the state-space problem in the time domain
     CVector qdot_temp(_nOmega, 0.0);
-    CVector qddot_temp(_nOmega, 0.0);
     CVector f_temp(_nOmega, 0.0);
     CVector temp_hold(_nOmega, 0.0); // Temporary hold for the frequency domain things
 
-    CVector x_temp(2 * _nTotal, 0.0); // Old & new? solution of the state-space problem in the frequency domain
+    CVector x_temp(2 * _nTotal, 0.0); // Old & new solution of the state-space problem in the frequency domain
     CVector RHS(2 * _nTotal, 0.0);    // Load vector
     CVector Res(2 * _nTotal, 0.0);    // Residual vector
     CMatrix MM(2 * _nTotal, 2 * _nTotal, 0.0);
     CMatrix KK(2 * _nTotal, 2 * _nTotal, 0.0);
-    CMatrix AAA(2 * _nTotal, 2 * _nTotal, 0.0); // Frequency derivative matrix
     CMatrix LHS(2 * _nTotal, 2 * _nTotal, 0.0);
     CMatrix dRes(2 * _nTotal, 2 * _nTotal, 0.0);
     CMatrix Aux(2 * _nTotal, 2 * _nTotal, 0.0);
     CVector dResdw(2 * _nTotal, 0.0);
+
+    //q_n = q;
+    std::cout << "Try 1" << std::endl;
+    q_n.print();
 
     for (unsigned int iOmega = 0; iOmega < _nOmega; iOmega++)
     {
@@ -922,23 +935,6 @@ void HarmonicSolver::Iterate(double &t0, double &tf, Structure *structure)
         }
     }
 
-    for (int iHarmonic = 1; iHarmonic <= _nHarmonic; iHarmonic++)
-    { // It... is signed down there. Option: iHarmonic*-1.0. Not that anybody will use that many harmonics!
-        AAA.SetElm(2 * iHarmonic + 1, 2 * iHarmonic, -iHarmonic * 1.0);
-        AAA.SetElm(2 * iHarmonic, 2 * iHarmonic + 1, iHarmonic * 1.0);
-        // For the dot ones
-        AAA.SetElm(2 * iHarmonic + 1 + _nTotal, 2 * iHarmonic + _nTotal, -iHarmonic * 1.0);
-        AAA.SetElm(2 * iHarmonic + _nTotal, 2 * iHarmonic + 1 + _nTotal, iHarmonic * 1.0);
-        if (_nDof == 2)
-        {
-            AAA.SetElm(2 * iHarmonic + 1 + _nOmega, 2 * iHarmonic + _nOmega, -iHarmonic * 1.0);
-            AAA.SetElm(2 * iHarmonic + _nOmega, 2 * iHarmonic + 1 + _nOmega, iHarmonic * 1.0);
-            // For the dot ones
-            AAA.SetElm(2 * iHarmonic + 1 + _nTotal + _nOmega, 2 * iHarmonic + _nTotal + _nOmega, -iHarmonic * 1.0);
-            AAA.SetElm(2 * iHarmonic + _nTotal + _nOmega, 2 * iHarmonic + 1 + _nTotal + _nOmega, iHarmonic * 1.0);
-        }
-    }
-
     for (unsigned int iDof = 0; iDof < _nDof; iDof++)
     {
         for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
@@ -952,7 +948,7 @@ void HarmonicSolver::Iterate(double &t0, double &tf, Structure *structure)
         {
             x_temp[jOmega + iDof * _nOmega] = temp_hold[jOmega];
         }
-        temp_hold = MatVecProd(AA, temp_hold);
+        temp_hold = omega*MatVecProd(AA, temp_hold);
         for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
         {
             x_temp[jOmega + iDof * _nOmega + _nTotal] = temp_hold[jOmega];
@@ -992,51 +988,49 @@ void HarmonicSolver::Iterate(double &t0, double &tf, Structure *structure)
 
     SolveSys(dRes, Res);
 
-    counter = 0;
-    for (unsigned int iDof = 0; iDof < _nDof; iDof++)
-    {
-        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-        {
-            if (jOmega + iDof * _nOmega != fDoF)
-            {
-                temp_hold[jOmega] = x_temp[jOmega + iDof * _nOmega] + Res[counter];
-                counter++;
-            }
-            else
-            {
-                temp_hold[jOmega] = 0.;
-            }
-        }
-        if (iDof == 1)
-        {
-            amplitude = temp_hold[1] * temp_hold[1];
-        }
-        q_temp = MatVecProd(Em1, temp_hold);
-        for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
-        {
-            q[jOmega + iDof * _nOmega] = q_temp[jOmega];
-        }
-    }
     deltaOmega = 0.;
     if (fixedDof < _nDof)
     {
         deltaOmega = Res[2 * _nTotal - 1];
     }
-    for (unsigned int iDof = 0; iDof < _nDof; iDof++)
+
+    counter = 0;
+    for (unsigned int iDof = 0; iDof < 2 * _nDof; iDof++) // Iterate over the state space
     {
         for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
         {
-            temp_hold[jOmega] = x_temp[jOmega + iDof * _nOmega + _nTotal] + Res[counter];
-            counter++;
-            q_temp[jOmega] = q[jOmega + iDof * _nOmega];
+            if (jOmega + iDof * _nOmega != fDoF)
+            {
+                x_temp[jOmega + iDof * _nOmega] = x_temp[jOmega + iDof * _nOmega] + Res[counter];
+                counter++;
+            }
+            else
+            {
+                x_temp[jOmega + iDof * _nOmega] = 0.;
+            }
+            temp_hold[jOmega] = x_temp[jOmega + iDof * _nOmega];
         }
-        qdot_temp = MatVecProd(d, q_temp) * (omega + deltaOmega) / omega;
-        qddot_temp = MatVecProd(d, qdot_temp) * (omega + deltaOmega) / omega;
+
+        q_temp = MatVecProd(Em1, temp_hold);
+        qdot_temp = MatVecProd(Em1, MatVecProd(AA, temp_hold)) * (omega + deltaOmega);
         for (unsigned int jOmega = 0; jOmega < _nOmega; jOmega++)
         {
-            qdot[jOmega + iDof * _nOmega] = qdot_temp[jOmega];
-            qddot[jOmega + iDof * _nOmega] = qddot_temp[jOmega];
+            if (iDof < _nDof)
+            {
+                q[jOmega + iDof * _nOmega] = q_temp[jOmega];
+                qdot[jOmega + iDof * _nOmega] = qdot_temp[jOmega];
+            }
+            else
+            {
+                qddot[jOmega + (iDof - _nDof) * _nOmega] = qdot_temp[jOmega];
+            }
         }
+    }
+    std::cout << "Try 7" << std::endl;
+    q_n.print();
+    if (_nDof == 2)
+    {
+        amplitude = x_temp[1 + _nOmega] * x_temp[1 + _nOmega];
     }
 
     omega_n = omega;
@@ -1044,10 +1038,6 @@ void HarmonicSolver::Iterate(double &t0, double &tf, Structure *structure)
 
 void HarmonicSolver::SetStates(unsigned int iInstance, unsigned int DoF, double displacement)
 {
-    CVector tempvel, tempacc, temppos;
-    temppos.Initialize(_nOmega, 0.0);
-    tempvel.Initialize(_nOmega, 0.0);
-    tempacc.Initialize(_nOmega, 0.0);
     q[iInstance + (DoF - 1) * _nOmega] = displacement;
 }
 
@@ -1129,7 +1119,6 @@ void AdjointHarmonicSolver::Iterate(double &t0, double &tf, Structure *structure
     CVector Res(2 * _nTotal, 0.0);    // Residual vector
     CMatrix MM(2 * _nTotal, 2 * _nTotal, 0.0);
     CMatrix KK(2 * _nTotal, 2 * _nTotal, 0.0);
-    CMatrix AAA(2 * _nTotal, 2 * _nTotal, 0.0); // Frequency derivative matrix
     CMatrix LHS(2 * _nTotal, 2 * _nTotal, 0.0);
     CMatrix dRes(2 * _nTotal, 2 * _nTotal, 0.0);
     CMatrix Aux(2 * _nTotal, 2 * _nTotal, 0.0);
@@ -1154,23 +1143,6 @@ void AdjointHarmonicSolver::Iterate(double &t0, double &tf, Structure *structure
             MM.SetElm(_nTotal + iOmega + 1, _nTotal + iOmega + 1 + _nOmega, structure->Get_S());
             MM.SetElm(_nTotal + iOmega + 1 + _nOmega, _nTotal + iOmega + 1, structure->Get_S());
             MM.SetElm(iOmega + 1 + _nOmega, iOmega + 1 + _nOmega, 1.);
-        }
-    }
-
-    for (int iHarmonic = 1; iHarmonic <= _nHarmonic; iHarmonic++)
-    { // It... is signed down there. Option: iHarmonic*-1.0. Not that anybody will use that many harmonics!
-        AAA.SetElm(2 * iHarmonic + 1, 2 * iHarmonic, -iHarmonic * 1.0);
-        AAA.SetElm(2 * iHarmonic, 2 * iHarmonic + 1, iHarmonic * 1.0);
-        // For the dot ones
-        AAA.SetElm(2 * iHarmonic + 1 + _nTotal, 2 * iHarmonic + _nTotal, -iHarmonic * 1.0);
-        AAA.SetElm(2 * iHarmonic + _nTotal, 2 * iHarmonic + 1 + _nTotal, iHarmonic * 1.0);
-        if (_nDof == 2)
-        {
-            AAA.SetElm(2 * iHarmonic + 1 + _nOmega, 2 * iHarmonic + _nOmega, -iHarmonic * 1.0);
-            AAA.SetElm(2 * iHarmonic + _nOmega, 2 * iHarmonic + 1 + _nOmega, iHarmonic * 1.0);
-            // For the dot ones
-            AAA.SetElm(2 * iHarmonic + 1 + _nTotal + _nOmega, 2 * iHarmonic + _nTotal + _nOmega, -iHarmonic * 1.0);
-            AAA.SetElm(2 * iHarmonic + _nTotal + _nOmega, 2 * iHarmonic + 1 + _nTotal + _nOmega, iHarmonic * 1.0);
         }
     }
 
@@ -1283,6 +1255,7 @@ void AdjointHarmonicSolver::Iterate(double &t0, double &tf, Structure *structure
 
 void AdjointHarmonicSolver::SetHBMatrices()
 {
+    unsigned int _nTotal = _nDof * _nOmega;
     std::cout << "AdjointHarmonicSolver::SetHBMatrices()" << std::endl;
     E.Reset();
     ET.Reset();
@@ -1294,8 +1267,21 @@ void AdjointHarmonicSolver::SetHBMatrices()
 
     for (unsigned short i = 1; i <= _nHarmonic; i++)
     {
-        AA.SetElm(2 * i + 1, 2 * i, -omega * i);
-        AA.SetElm(2 * i, 2 * i + 1, omega * i);
+        AA.SetElm(2 * i + 1, 2 * i, i * -1.0);
+        AA.SetElm(2 * i, 2 * i + 1, i * 1.0);
+        AAA.SetElm(2 * i + 1, 2 * i, i * -1.0);
+        AAA.SetElm(2 * i, 2 * i + 1, i * 1.0);
+        // For the dot ones
+        AAA.SetElm(2 * i + 1 + _nTotal, 2 * i + _nTotal, i * -1.0);
+        AAA.SetElm(2 * i + _nTotal, 2 * i + 1 + _nTotal, i * 1.0);
+        if (_nDof == 2)
+        {
+            AAA.SetElm(2 * i + 1 + _nOmega, 2 * i + _nOmega, i * -1.0);
+            AAA.SetElm(2 * i + _nOmega, 2 * i + 1 + _nOmega, i * 1.0);
+            // For the dot ones
+            AAA.SetElm(2 * i + 1 + _nTotal + _nOmega, 2 * i + _nTotal + _nOmega, i * -1.0);
+            AAA.SetElm(2 * i + _nTotal + _nOmega, 2 * i + 1 + _nTotal + _nOmega, i * 1.0);
+        }
         for (unsigned short j = 0; j < _nOmega; j++)
         {
             Em1.SetElm(j + 1, 2 * i, cos(2 * M_PI * j / _nOmega * i));
@@ -1307,9 +1293,6 @@ void AdjointHarmonicSolver::SetHBMatrices()
 
     SolveSys(Em1, E);
     SolveSys(Em1T, ET);
-    d = MatMatProd(AA, E);
-    d = MatMatProd(Em1, d);
-    d2 = MatMatProd(d, d);
 }
 
 double AdjointHarmonicSolver::GetStiffnessDerivative(unsigned int dof)
@@ -1381,7 +1364,7 @@ double AdjointHarmonicSolver::GetImbalanceDerivative()
             if (_nDof == 2)
             {
                 dSdS[i + _nOmega] += qddot[i];
-                dSdS[i] += qddot[i + _nOmega]; // TODO: Remove hardcoding but I need the structure boo
+                dSdS[i] += qddot[i + _nOmega];
             }
         }
     }

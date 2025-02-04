@@ -123,9 +123,8 @@ protected:
     double omega_n; // Old base frequency
     double deltaOmega;
     double amplitude;
-    CMatrix d;   // Harmonic balance time derivative
-    CMatrix d2;  // Harmonic balance second time derivative
-    CMatrix AA;  // Harmonic balance physics matrix
+    CMatrix AA;  // Harmonic balance time derivative matrix
+    CMatrix AAA;  // Harmonic balance extended time derivative matrix
     CMatrix E;   // Harmonic balance DFT matrix
     CMatrix Em1; // Harmonic balance IFT matrix
 
@@ -139,11 +138,7 @@ public:
     virtual void SetInitialState(Config *config, Structure *structure);
     virtual void SetHBMatrices();
     virtual void SetStates(unsigned int iInstance, unsigned int dof, double displacement);
-    virtual void SetOmega(double val_omega)
-    {
-        omega = val_omega;
-        SetHBMatrices();
-    };
+    virtual void SetOmega(double val_omega) { omega = val_omega; };
     virtual double GetOmega() { return omega; };
     virtual double GetDeltaOmega() { return deltaOmega; };
     virtual double GetAmplitude() { return amplitude; };
